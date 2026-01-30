@@ -4,15 +4,19 @@
 #include <stddef.h>
 
 typedef struct {
-        char *chars;
-        size_t len;
-        size_t cap;
+        char   *chars;
+        size_t  len;
+        size_t  cap;
 } str;
 
-str str_create(void);
-str str_from(const char *chars);
+str         str_create(void);
+str         str_from(const char *chars);
 const char *str_cstr(const str *s);
-void str_append(str *s, char c);
-void str_concat(str *s, const char *chars);
+void        str_append(str *s, char c);
+void        str_concat(str *s, const char *chars);
+void        str_overwrite(str *s, const char *repl);
+void        str_clear(str *s);
+size_t      str_len(const str *s);
+void        str_destroy(str *s);
 
 #endif // STR_H_INCLUDED

@@ -7,11 +7,11 @@
 #include <stddef.h>
 
 typedef struct {
-        str filename;
-        line_array lns;
-        size_t cx;
-        size_t cy;
-        line **al;
+        str          filename;
+        line_array   lns;
+        size_t       cx;
+        size_t       cy;
+        line       **al;
 } buffer;
 
 buffer *buffer_alloc(void);

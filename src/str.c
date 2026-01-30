@@ -1,14 +1,15 @@
 #include "str.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 str
 str_create(void)
 {
         return (str) {
                 .chars = NULL,
-                .len = 0,
-                .cap = 0,
+                .len   = 0,
+                .cap   = 0,
         };
 }
 
@@ -41,4 +42,33 @@ str_concat(str *s, const char *chars)
 {
         for (size_t i = 0; chars[i]; ++i)
                 str_append(s, chars[i]);
+}
+
+void
+str_clear(str *s)
+{
+        memset(s->chars, 0, s->cap);
+        s->len = 0;
+}
+
+void
+str_overwrite(str *s, const char *repl)
+{
+        str_clear(s);
+        str_concat(s, repl);
+}
+
+inline size_t
+str_len(const str *s)
+{
+        return s->len;
+}
+
+void
+str_destroy(str *s)
+{
+        free(s->chars);
+        s->chars = NULL;
+        s->len   = 0;
+        s->cap   = 0;
 }
