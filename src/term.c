@@ -185,3 +185,11 @@ void
 gotoxy(int x, int y) {
         printf("\033[%d;%dH", y+1, x+1);
 }
+
+void
+clear_to_eol(size_t dx, size_t dy)
+{
+        printf("\x1b[K");
+        gotoxy(dx, dy);
+        fflush(stdout);
+}

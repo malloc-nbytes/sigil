@@ -101,6 +101,19 @@ insert_char(buffer *b, char ch)
         ++b->cx;
 }
 
+void
+buffer_dump_xy(const buffer *b)
+{
+        const str *s;
+
+        s = &b->lns.data[b->al]->s;
+        gotoxy(0, b->cy);
+        clear_to_eol(0, b->cy);
+        printf("%s", str_cstr(s));
+        gotoxy(b->cx, b->cy);
+        fflush(stdout);
+}
+
 buffer_proc
 buffer_process(buffer     *b,
                input_type  ty,
@@ -135,7 +148,6 @@ buffer_process(buffer     *b,
         case INPUT_TYPE_ARROW: {
                 movement_ar[ch-'A'](b);
                 gotoxy(b->cx, b->cy);
-                fflush(stdout);
                 return BP_MOV;
         } break;
         case INPUT_TYPE_NORMAL: {
@@ -149,9 +161,7 @@ buffer_process(buffer     *b,
 }
 
 void
-buffer_dump(const buffer *b,
-            size_t        cx,
-            size_t        cy)
+buffer_dump(const buffer *b)
 {
         for (size_t i = 0; i < b->lns.len; ++i) {
                 line *l = b->lns.data[i];

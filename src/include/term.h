@@ -96,6 +96,7 @@ input_type get_input(char *c);
 void       clear_terminal(void);
 void       clear_line(void);
 void       gotoxy(int x, int y);
-
+// dx, dy -> return coordinates after clearing line
+void       clear_to_eol(size_t dx, size_t dy);
 
 #endif // TERM_H_INCLUDED

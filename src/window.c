@@ -60,7 +60,7 @@ window_handle(window *win)
         assert(win->ab);
 
         clear_terminal();
-        buffer_dump(win->ab, 0, 0);
+        buffer_dump(win->ab);
         gotoxy(win->ab->cx, win->ab->cy);
         fflush(stdout);
 
@@ -70,23 +70,20 @@ window_handle(window *win)
 
                 char        ch;
                 input_type  ty;
-                buffer_proc proc;
+                buffer_proc bproc;
 
                 ty = get_input(&ch);
 
                 if (ty == INPUT_TYPE_ALT)
                         assert(0);
-                else if (ty == INPUT_TYPE_CTRL && ch == CTRL_X) {
+                else if (ty == INPUT_TYPE_CTRL && ch == CTRL_X)
                         ctrlx(win);
-                }
                 else {
-                        proc = buffer_process(win->ab, ty, ch);
+                        bproc = buffer_process(win->ab, ty, ch);
 
-                        if (proc == BP_INSERT) {
-                                
-                                fflush(stdout);
-                        }
-                        else if (proc == BP_MOV)
+                        if (bproc == BP_INSERT)
+                                buffer_dump_xy(win->ab);
+                        else if (bproc == BP_MOV)
                                 fflush(stdout);
                 }
         }
