@@ -9,8 +9,8 @@
 #include <stddef.h>
 
 typedef enum {
-        BP_NOP,
-        BP_UPDATE = 0,
+        BP_NOP = 0,
+        BP_UPDATE,
         BP_MOV,
 } buffer_proc;
 
@@ -19,7 +19,7 @@ typedef struct {
         line_array   lns;
         size_t       cx;
         size_t       cy;
-        line       **al;
+        size_t       al;
 } buffer;
 
 DYN_ARRAY_TYPE(buffer *, bufferp_array);

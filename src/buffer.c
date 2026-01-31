@@ -1,8 +1,10 @@
 #include "buffer.h"
 #include "io.h"
+#include "term.h"
 
 #include <assert.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 buffer *
 buffer_alloc(void)
@@ -13,7 +15,7 @@ buffer_alloc(void)
         b->lns      = dyn_array_empty(line_array);
         b->cx       = 0;
         b->cy       = 0;
-        b->al       = NULL;
+        b->al       = 0;
 
         return b;
 }
@@ -32,10 +34,46 @@ buffer_from_file(str filename)
 
                 file_data = load_file(str_cstr(&filename));
                 b->lns    = lines_of_cstr(file_data);
-                b->al     = &b->lns.data[0];
+                b->al     = 0;
         }
 
         return b;
+}
+
+static void
+buffer_up(buffer *b)
+{
+        if (b->cy > 0) {
+                --b->cy;
+                --b->al;
+        }
+}
+
+static void
+buffer_down(buffer *b)
+{
+        if (b->cy < b->lns.len-1) {
+                ++b->cy;
+                ++b->al;
+        }
+}
+
+static void
+buffer_right(buffer *b)
+{
+        str *s = &b->lns.data[b->al]->s;
+
+        if (b->cx < s->len-1) {
+                ++b->cx;
+        }
+}
+
+static void
+buffer_left(buffer *b)
+{
+        if (b->cx > 0) {
+                --b->cx;
+        }
 }
 
 buffer_proc
@@ -43,11 +81,30 @@ buffer_process(buffer     *b,
                input_type  ty,
                char        ch)
 {
-        assert(0);
+        void (*movement_ar[4])(buffer *) = {
+                buffer_up,
+                buffer_down,
+                buffer_right,
+                buffer_left,
+        };
+
+        switch (ty) {
+        case INPUT_TYPE_ARROW:
+                movement_ar[ch-'A'](b);
+                gotoxy(b->cx, b->cy);
+                fflush(stdout);
+                return BP_MOV;
+        default: break;
+        }
+
+        return BP_NOP;
 }
 
 void
 buffer_dump(const buffer *b)
 {
-        assert(0);
+        for (size_t i = 0; i < b->lns.len; ++i) {
+                line *l = b->lns.data[i];
+                printf("%s", str_cstr(&l->s));
+        }
 }

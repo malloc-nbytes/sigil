@@ -73,10 +73,10 @@
  */
 #define CSI(ch)       ((ch) == '[')
 
-#define CURSOR_LEFT(n)  printf("\033[%dD", n);
-#define CURSOR_RIGHT(n) printf("\033[%dC", n);
-#define CURSOR_UP(n)    printf("\033[%dA", n);
-#define CURSOR_DOWN(n)  printf("\033[%dB", n);
+#define CURSOR_LEFT(n)  do { printf("\033[%dD", n); } while (0)
+#define CURSOR_RIGHT(n) do { printf("\033[%dC", n); } while (0)
+#define CURSOR_UP(n)    do { printf("\033[%dA", n); } while (0)
+#define CURSOR_DOWN(n)  do { printf("\033[%dB", n); } while (0)
 
 // Different input types.
 typedef enum {
@@ -95,6 +95,7 @@ int        disable_raw_terminal(int fd, struct termios *old_termios);
 input_type get_input(char *c);
 void       clear_terminal(void);
 void       clear_line(void);
+void       gotoxy(int x, int y);
 
 
 #endif // TERM_H_INCLUDED

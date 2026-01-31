@@ -30,7 +30,10 @@ window_handle(window *win)
 {
         assert(win->ab);
 
+        clear_terminal();
         buffer_dump(win->ab);
+        gotoxy(win->ab->cx, win->ab->cy);
+        fflush(stdout);
 
         while (1) {
                 char        ch;
@@ -46,6 +49,6 @@ window_handle(window *win)
                 proc = buffer_process(win->ab, ty, ch);
 
                 if (proc == BP_UPDATE) assert(0);
-                else if (proc == BP_MOV) assert(0);
+                else if (proc == BP_MOV);
         }
 }
