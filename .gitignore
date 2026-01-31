@@ -1,5 +1,6 @@
 main
 ced
+Makefile
 src/Makefile
 Makefile.in
 aclocal.m4
