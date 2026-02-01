@@ -16,6 +16,7 @@ buffer_alloc(void)
         b->cx       = 0;
         b->cy       = 0;
         b->al       = 0;
+        b->wish_col = 0;
 
         return b;
 }
@@ -49,8 +50,10 @@ buffer_up(buffer *b)
         }
 
         const str *s = &b->lns.data[b->al]->s;
-        if (b->cx > str_len(s)-1)
+        if (b->wish_col > str_len(s)-1)
                 b->cx = str_len(s)-1;
+        else
+                b->cx = b->wish_col;
 
         gotoxy(b->cx, b->cy);
 }
@@ -63,9 +66,12 @@ buffer_down(buffer *b)
                 ++b->al;
         }
 
+
         const str *s = &b->lns.data[b->al]->s;
-        if (b->cx > str_len(s)-1)
+        if (b->wish_col > str_len(s)-1)
                 b->cx = str_len(s)-1;
+        else
+                b->cx = b->wish_col;
 
         gotoxy(b->cx, b->cy);
 }
@@ -82,6 +88,7 @@ buffer_right(buffer *b)
         }
         else if (b->cx < str_len(s)-1)
                 ++b->cx;
+        b->wish_col = b->cx;
         gotoxy(b->cx, b->cy);
 }
 
@@ -95,6 +102,7 @@ buffer_left(buffer *b)
         }
         else if (b->cx > 0)
                 --b->cx;
+        b->wish_col = b->cx;
         gotoxy(b->cx, b->cy);
 }
 
@@ -102,6 +110,7 @@ static void
 buffer_eol(buffer *b)
 {
         b->cx = str_len(&b->lns.data[b->al]->s)-1;
+        b->wish_col = b->cx;
         gotoxy(b->cx, b->cy);
 }
 
@@ -109,6 +118,7 @@ static void
 buffer_bol(buffer *b)
 {
         b->cx = 0;
+        b->wish_col = b->cx;
         gotoxy(b->cx, b->cy);
 }
 
@@ -127,6 +137,8 @@ insert_char(buffer *b, char ch)
                 ++b->cy;
                 ++b->al;
         }
+
+        b->wish_col = b->cx;
 }
 
 void

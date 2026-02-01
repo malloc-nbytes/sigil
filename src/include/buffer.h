@@ -21,6 +21,7 @@ typedef struct {
         size_t       cx;
         size_t       cy;
         size_t       al;
+        size_t       wish_col;
 } buffer;
 
 DYN_ARRAY_TYPE(buffer *, bufferp_array);
