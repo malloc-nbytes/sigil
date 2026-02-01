@@ -108,3 +108,17 @@ str_cut(str *s, size_t i)
         memset(s->chars+i, 0, s->cap-i);
         s->len = i;
 }
+
+void
+str_rm(str *s, size_t i)
+{
+        if (i >= s->len)
+                return;
+
+        memmove(s->chars+i,
+                s->chars+i+1,
+                s->len-i);
+
+        s->chars[s->len-1] = 0;
+        --s->len;
+}

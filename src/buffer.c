@@ -51,6 +51,8 @@ buffer_up(buffer *b)
         const str *s = &b->lns.data[b->al]->s;
         if (b->cx > str_len(s)-1)
                 b->cx = str_len(s)-1;
+
+        gotoxy(b->cx, b->cy);
 }
 
 static void
@@ -64,6 +66,8 @@ buffer_down(buffer *b)
         const str *s = &b->lns.data[b->al]->s;
         if (b->cx > str_len(s)-1)
                 b->cx = str_len(s)-1;
+
+        gotoxy(b->cx, b->cy);
 }
 
 static void
@@ -73,6 +77,7 @@ buffer_right(buffer *b)
 
         if (b->cx < str_len(s)-1)
                 ++b->cx;
+        gotoxy(b->cx, b->cy);
 }
 
 static void
@@ -80,28 +85,30 @@ buffer_left(buffer *b)
 {
         if (b->cx > 0)
                 --b->cx;
+        gotoxy(b->cx, b->cy);
 }
 
 static void
 buffer_eol(buffer *b)
 {
         b->cx = str_len(&b->lns.data[b->al]->s)-1;
+        gotoxy(b->cx, b->cy);
 }
 
 static void
 buffer_bol(buffer *b)
 {
         b->cx = 0;
+        gotoxy(b->cx, b->cy);
 }
 
 static void
 insert_char(buffer *b, char ch)
 {
         str_insert(&b->lns.data[b->al]->s, b->cx, ch);
+        ++b->cx;
 
         if (ch == 10) {
-                ++b->cx;
-
                 const char *rest = str_cstr(&b->lns.data[b->al]->s)+b->cx;
                 line *newln = line_from(9999, str_from(rest));
                 dyn_array_insert_at(b->lns, b->al+1, newln);
@@ -109,8 +116,6 @@ insert_char(buffer *b, char ch)
                 b->cx = 0;
                 ++b->cy;
                 ++b->al;
-        } else {
-                ++b->cx;
         }
 }
 
@@ -124,6 +129,12 @@ buffer_dump_xy(const buffer *b)
         printf("%s", str_cstr(s));
         gotoxy(b->cx, b->cy);
         fflush(stdout);
+}
+
+static void
+del_char(buffer *b)
+{
+        assert(0);
 }
 
 buffer_proc
@@ -142,24 +153,31 @@ buffer_process(buffer     *b,
 
         switch (ty) {
         case INPUT_TYPE_CTRL: {
-                if (ch == CTRL_N)
+                if (ch == CTRL_N) {
                         movement_ar[1](b);
-                else if (ch == CTRL_P)
+                        return BP_MOV;
+                } else if (ch == CTRL_P) {
                         movement_ar[0](b);
-                else if (ch == CTRL_F)
+                        return BP_MOV;
+                } else if (ch == CTRL_F) {
                         movement_ar[2](b);
-                else if (ch == CTRL_B)
+                        return BP_MOV;
+                } else if (ch == CTRL_B) {
                         movement_ar[3](b);
-                else if (ch == CTRL_E)
+                        return BP_MOV;
+                } else if (ch == CTRL_E) {
                         movement_ar[4](b);
-                else if (ch == CTRL_A)
+                        return BP_MOV;
+                } else if (ch == CTRL_A) {
                         movement_ar[5](b);
-                gotoxy(b->cx, b->cy);
-                return BP_MOV;
+                        return BP_MOV;
+                } else if (ch == CTRL_D) {
+                        del_char(b);
+                        return BP_INSERT;
+                }
         } break;
         case INPUT_TYPE_ARROW: {
                 movement_ar[ch-'A'](b);
-                gotoxy(b->cx, b->cy);
                 return BP_MOV;
         } break;
         case INPUT_TYPE_NORMAL: {
