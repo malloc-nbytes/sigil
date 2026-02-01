@@ -75,7 +75,12 @@ buffer_right(buffer *b)
 {
         str *s = &b->lns.data[b->al]->s;
 
-        if (b->cx < str_len(s)-1)
+        if (b->cx == str_len(s)-1 && b->cy < b->lns.len-1) {
+                b->cx = 0;
+                ++b->cy;
+                ++b->al;
+        }
+        else if (b->cx < str_len(s)-1)
                 ++b->cx;
         gotoxy(b->cx, b->cy);
 }
@@ -83,7 +88,12 @@ buffer_right(buffer *b)
 static void
 buffer_left(buffer *b)
 {
-        if (b->cx > 0)
+        if (b->cx == 0 && b->cy > 0) {
+                b->cx = str_len(&b->lns.data[b->al-1]->s)-1;
+                --b->cy;
+                --b->al;
+        }
+        else if (b->cx > 0)
                 --b->cx;
         gotoxy(b->cx, b->cy);
 }
@@ -155,6 +165,36 @@ del_char(buffer *b)
         return newline;
 }
 
+static int
+backspace(buffer *b)
+{
+        line *ln;
+        int   newline;
+
+        ln      = b->lns.data[b->al];
+        newline = 0;
+
+        /* if (b->cx == 0) { */
+        /*         if (b->al == 0) */
+        /*                 return 0; */
+        /*         line *prevln = b->lns.data[b->al-1]; */
+        /*         str_concat(&prevln->s, str_cstr(&ln->s)); */
+        /*         line_free(b->lns.data[b->al]); */
+        /*         dyn_array_rm_at(b->lns, b->al); */
+        /*         //b->cx = str_len(&prevln->s)-1; */
+        /*         --b->cy; */
+        /*         return 1; */
+        /* } */
+
+        buffer_left(b);
+
+        str_rm(&ln->s, b->cx);
+        if (b->cx > str_len(&ln->s)-1)
+                b->cx = str_len(&ln->s)-1;
+
+        return newline;
+}
+
 buffer_proc
 buffer_process(buffer     *b,
                input_type  ty,
@@ -198,6 +238,9 @@ buffer_process(buffer     *b,
                 return BP_MOV;
         } break;
         case INPUT_TYPE_NORMAL: {
+                if (BACKSPACE(ch)) {
+                        return backspace(b) ? BP_INSERTNL : BP_INSERT;
+                }
                 insert_char(b, ch);
                 return ch == 10 ? BP_INSERTNL : BP_INSERT;
         } break;

@@ -47,6 +47,9 @@ str_append(str *s, char c)
 void
 str_concat(str *s, const char *chars)
 {
+        if (!chars || !*chars)
+                return;
+
         for (size_t i = 0; chars[i]; ++i)
                 str_append(s, chars[i]);
 }
