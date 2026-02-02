@@ -89,7 +89,7 @@ buffer_up(buffer *b)
         else
                 b->cx = b->wish_col;
 
-        gotoxy(b->cx, b->cy);
+        gotoxy(b->cx - b->hscrloff, b->cy - b->vscrloff);
         adjust_scroll(b);
 }
 
@@ -108,7 +108,7 @@ buffer_down(buffer *b)
         else
                 b->cx = b->wish_col;
 
-        gotoxy(b->cx, b->cy);
+        gotoxy(b->cx - b->hscrloff, b->cy - b->vscrloff);
         adjust_scroll(b);
 }
 
@@ -125,7 +125,7 @@ buffer_right(buffer *b)
         else if (b->cx < str_len(s)-1)
                 ++b->cx;
         b->wish_col = b->cx;
-        gotoxy(b->cx, b->cy);
+        gotoxy(b->cx - b->hscrloff, b->cy - b->vscrloff);
         adjust_scroll(b);
 }
 
@@ -140,7 +140,7 @@ buffer_left(buffer *b)
         else if (b->cx > 0)
                 --b->cx;
         b->wish_col = b->cx;
-        gotoxy(b->cx, b->cy);
+        gotoxy(b->cx - b->hscrloff, b->cy - b->vscrloff);
         adjust_scroll(b);
 }
 
@@ -149,7 +149,7 @@ buffer_eol(buffer *b)
 {
         b->cx = str_len(&b->lns.data[b->al]->s)-1;
         b->wish_col = b->cx;
-        gotoxy(b->cx, b->cy);
+        gotoxy(b->cx - b->hscrloff, b->cy - b->vscrloff);
         adjust_scroll(b);
 }
 
@@ -158,7 +158,7 @@ buffer_bol(buffer *b)
 {
         b->cx = 0;
         b->wish_col = b->cx;
-        gotoxy(b->cx, b->cy);
+        gotoxy(b->cx - b->hscrloff, b->cy - b->vscrloff);
         adjust_scroll(b);
 }
 
@@ -190,7 +190,7 @@ buffer_dump_xy(const buffer *b)
         s = &b->lns.data[b->al]->s;
         clear_line(0, b->cy);
         printf("%s", str_cstr(s));
-        gotoxy(b->cx, b->cy);
+        gotoxy(b->cx - b->hscrloff, b->cy - b->vscrloff);
         fflush(stdout);
 }
 
@@ -328,14 +328,17 @@ buffer_dump(const buffer *b)
         size_t end;
 
         start = b->vscrloff;
-        start = 0;
+        end   = start + b->parent->h;
 
-        for (size_t i = start; i < b->lns.len; ++i) {
-                line *l = b->lns.data[i];
+        if (end > b->lns.len)
+                end = b->lns.len;
+
+        for (size_t i = start; i < end; ++i) {
+                const line *l = b->lns.data[i];
                 printf("%s", str_cstr(&l->s));
         }
 
-        gotoxy(b->cx, b->cy);
+        gotoxy(b->cx - b->hscrloff, b->cy - b->vscrloff);
         fflush(stdout);
 }
 
