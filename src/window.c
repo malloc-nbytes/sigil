@@ -40,7 +40,14 @@ close_buffer(window *win)
                 --win->abi;
 }
 
-static void
+static int
+save_buffer(window *win)
+{
+        if (!buffer_save(win->ab))
+                return 0;
+}
+
+static int
 ctrlx(window *win)
 {
         char        ch;
@@ -50,8 +57,13 @@ ctrlx(window *win)
         case INPUT_TYPE_NORMAL:
                 if (ch == 'q')
                         close_buffer(win);
+        case INPUT_TYPE_CTRL:
+                if (ch == CTRL_S)
+                        return save_buffer(win);
         default: break;
         }
+
+        return 1;
 }
 
 void

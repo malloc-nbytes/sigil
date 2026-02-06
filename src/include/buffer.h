@@ -36,5 +36,6 @@ buffer      *buffer_from_file(str filename, window *parent);
 buffer_proc  buffer_process(buffer *b, input_type ty, char ch);
 void         buffer_dump(const buffer *b);
 void         buffer_dump_xy(const buffer *b);
+int          buffer_save(const buffer *b);
 
 #endif // BUFFER_H_INUCLUDED

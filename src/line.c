@@ -46,6 +46,12 @@ lines_of_cstr(const char *s)
                 }
         }
 
+        if (buf.len) {
+                dyn_array_append(lns, line_from_cstr(buf.data));
+        }
+
+        dyn_array_append(buf, 0);
+
         dyn_array_free(buf);
 
         return lns;

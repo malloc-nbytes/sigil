@@ -26,6 +26,24 @@ buffer_alloc(window *parent)
         return b;
 }
 
+int
+buffer_save(const buffer *b)
+{
+        char_array content = dyn_array_empty(char_array);
+        for (size_t i = 0; i < b->lns.len; ++i) {
+                const line *ln = b->lns.data[i];
+                for (size_t j = 0; j < ln->s.len; ++j) {
+                        dyn_array_append(content, ln->s.chars[j]);
+                }
+        }
+        dyn_array_append(content, 0);
+        if (!write_file(str_cstr(&b->filename), content.data)) {
+                perror("write_file");
+                return 0;
+        }
+        return 1;
+}
+
 buffer *
 buffer_from_file(str filename, window *parent)
 {
@@ -40,8 +58,14 @@ buffer_from_file(str filename, window *parent)
 
                 file_data = load_file(str_cstr(&filename));
                 b->lns    = lines_of_cstr(file_data);
-                b->al     = 0;
+        } else {
+                if (!create_file(str_cstr(&filename), 1)) {
+                        perror("create_file");
+                        return NULL;
+                }
         }
+
+        b->al = 0;
 
         return b;
 }
@@ -165,6 +189,11 @@ buffer_bol(buffer *b)
 static void
 insert_char(buffer *b, char ch)
 {
+        if (!b->lns.data) {
+                char tmp[2] = {10, 0};
+                dyn_array_append(b->lns, line_from(str_from(tmp)));
+        }
+
         str_insert(&b->lns.data[b->al]->s, b->cx, ch);
         ++b->cx;
 
@@ -187,7 +216,8 @@ buffer_dump_xy(const buffer *b)
 {
         const str *s;
 
-        s = &b->lns.data[b->al]->s;
+        if (!(s = &b->lns.data[b->al]->s))
+                return;
         clear_line(0, b->cy - b->vscrloff);
         printf("%s", str_cstr(s));
         gotoxy(b->cx - b->hscrloff, b->cy - b->vscrloff);
@@ -335,6 +365,7 @@ buffer_dump(const buffer *b)
 
         for (size_t i = start; i < end; ++i) {
                 const line *l = b->lns.data[i];
+                if (!l) break;
                 printf("%s", str_cstr(&l->s));
         }
 

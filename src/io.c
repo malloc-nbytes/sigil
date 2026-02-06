@@ -17,17 +17,20 @@ file_exists(const char *fp)
         return 0;
 }
 
-void
+int
 create_file(const char *fp,
             int         force_overwrite)
 {
         FILE *f;
 
         if (!force_overwrite && file_exists(fp))
-                return;
+                return 1;
 
-        f = fopen(fp, "w");
+        if (!(f = fopen(fp, "w")))
+                return 0;
+
         fclose(f);
+        return 1;
 }
 
 int
@@ -71,6 +74,7 @@ load_file(const char *path)
 
         buf = (char *)malloc(size + 1);
         fread(buf, 1, size, f);
+
         fclose(f);
 
         buf[size] = '\0';

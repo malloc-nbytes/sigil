@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-static void
+static int
 run(const char *filename)
 {
         window  win;
@@ -20,10 +20,14 @@ run(const char *filename)
 
         fp     = str_from(filename);
         win    = window_create(glconf.term.w, glconf.term.h);
-        buffer = buffer_from_file(fp, &win);
+
+        if (!(buffer = buffer_from_file(fp, &win)))
+                return 0;
 
         window_add_buffer(&win, buffer, 1);
         window_handle(&win);
+
+        return 1;
 }
 
 static int
@@ -63,8 +67,8 @@ main(int argc, char *argv[])
 
         atexit(cleanup);
         filename = parse_args(argc, argv);
-        run(filename);
+        int res = run(filename);
         free(filename);
 
-        return 0;
+        return res;
 }

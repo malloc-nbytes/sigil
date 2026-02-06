@@ -1,5 +1,6 @@
 #include "str.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -16,11 +17,13 @@ try_resize(str *s)
 str
 str_create(void)
 {
-        return (str) {
-                .chars = NULL,
+        str s = (str) {
+                .chars = calloc(2, 1),
                 .len   = 0,
-                .cap   = 0,
+                .cap   = 2,
         };
+
+        return s;
 }
 
 str
@@ -77,7 +80,8 @@ str_len(const str *s)
 void
 str_destroy(str *s)
 {
-        free(s->chars);
+        if (s->chars)
+                free(s->chars);
         s->chars = NULL;
         s->len   = 0;
         s->cap   = 0;
