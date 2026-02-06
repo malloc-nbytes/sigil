@@ -85,7 +85,7 @@ window_handle(window *win)
                         else if (bproc == BP_INSERTNL)
                                 buffer_dump(win->ab);
                         else if (bproc == BP_MOV)
-                                fflush(stdout);
+                                buffer_dump(win->ab);
                 }
         }
 }
