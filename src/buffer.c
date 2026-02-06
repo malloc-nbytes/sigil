@@ -188,7 +188,7 @@ buffer_dump_xy(const buffer *b)
         const str *s;
 
         s = &b->lns.data[b->al]->s;
-        clear_line(0, b->cy);
+        clear_line(0, b->cy - b->vscrloff);
         printf("%s", str_cstr(s));
         gotoxy(b->cx - b->hscrloff, b->cy - b->vscrloff);
         fflush(stdout);
