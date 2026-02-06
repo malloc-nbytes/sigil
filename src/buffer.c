@@ -170,7 +170,7 @@ insert_char(buffer *b, char ch)
 
         if (ch == 10) {
                 const char *rest = str_cstr(&b->lns.data[b->al]->s)+b->cx;
-                line *newln = line_from(9999, str_from(rest));
+                line *newln = line_from(str_from(rest));
                 dyn_array_insert_at(b->lns, b->al+1, newln);
                 str_cut(&b->lns.data[b->al]->s, b->cx);
                 b->cx = 0;
