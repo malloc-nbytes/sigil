@@ -198,10 +198,15 @@ insert_char(buffer *b, char ch)
         ++b->cx;
 
         if (ch == 10) {
-                const char *rest = str_cstr(&b->lns.data[b->al]->s)+b->cx;
-                line *newln = line_from(str_from(rest));
+                const char *rest;
+                line       *newln;
+
+                rest = str_cstr(&b->lns.data[b->al]->s)+b->cx;
+                newln = line_from(str_from(rest));
+
                 dyn_array_insert_at(b->lns, b->al+1, newln);
                 str_cut(&b->lns.data[b->al]->s, b->cx);
+
                 b->cx = 0;
                 ++b->cy;
                 ++b->al;
@@ -295,6 +300,17 @@ tab(buffer *b)
                 insert_char(b, ' ');
 }
 
+static void
+delete_until_eol(buffer *b)
+{
+        line *ln;
+
+        ln = b->lns.data[b->al];
+
+        str_cut(&ln->s, b->cx);
+        str_insert(&ln->s, b->cx, 10);
+}
+
 buffer_proc
 buffer_process(buffer     *b,
                input_type  ty,
@@ -333,6 +349,9 @@ buffer_process(buffer     *b,
                         return del_char(b) ? BP_INSERTNL : BP_INSERT;
                 } else if (TAB(ch)) {
                         tab(b);
+                        return BP_INSERT;
+                } else if (ch == CTRL_K) {
+                        delete_until_eol(b);
                         return BP_INSERT;
                 }
         } break;
