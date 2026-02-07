@@ -3,6 +3,7 @@
 #include "term.h"
 #include "utils.h"
 #include "window.h"
+#include "colors.h"
 
 #include <assert.h>
 #include <stdlib.h>
@@ -125,7 +126,6 @@ buffer_down(buffer *b)
                 ++b->al;
         }
 
-
         const str *s = &b->lns.data[b->al]->s;
         if (b->wish_col > str_len(s)-1)
                 b->cx = str_len(s)-1;
@@ -198,10 +198,15 @@ insert_char(buffer *b, char ch)
         ++b->cx;
 
         if (ch == 10) {
-                const char *rest = str_cstr(&b->lns.data[b->al]->s)+b->cx;
-                line *newln = line_from(str_from(rest));
+                const char *rest;
+                line       *newln;
+
+                rest = str_cstr(&b->lns.data[b->al]->s)+b->cx;
+                newln = line_from(str_from(rest));
+
                 dyn_array_insert_at(b->lns, b->al+1, newln);
                 str_cut(&b->lns.data[b->al]->s, b->cx);
+
                 b->cx = 0;
                 ++b->cy;
                 ++b->al;
@@ -209,19 +214,6 @@ insert_char(buffer *b, char ch)
 
         b->wish_col = b->cx;
         adjust_scroll(b);
-}
-
-void
-buffer_dump_xy(const buffer *b)
-{
-        const str *s;
-
-        if (!(s = &b->lns.data[b->al]->s))
-                return;
-        clear_line(0, b->cy - b->vscrloff);
-        printf("%s", str_cstr(s));
-        gotoxy(b->cx - b->hscrloff, b->cy - b->vscrloff);
-        fflush(stdout);
 }
 
 static int
@@ -265,15 +257,18 @@ backspace(buffer *b)
         if (b->cx == 0) {
                 if (b->al == 0)
                         return 0;
-                line *prevln = b->lns.data[b->al-1];
-                size_t prevln_len = str_len(&prevln->s);
+                line   *prevln     = b->lns.data[b->al-1];
+                size_t  prevln_len = str_len(&prevln->s);
+
                 str_rm(&prevln->s, prevln_len-1);
                 str_concat(&prevln->s, str_cstr(&ln->s));
                 line_free(b->lns.data[b->al]);
                 dyn_array_rm_at(b->lns, b->al);
+
                 --b->al;
                 b->cx = prevln_len-1;
                 --b->cy;
+
                 adjust_scroll(b);
                 return 1;
         }
@@ -293,6 +288,17 @@ tab(buffer *b)
 {
         for (size_t i = 0; i < 8; ++i)
                 insert_char(b, ' ');
+}
+
+static void
+delete_until_eol(buffer *b)
+{
+        line *ln;
+
+        ln = b->lns.data[b->al];
+
+        str_cut(&ln->s, b->cx);
+        str_insert(&ln->s, b->cx, 10);
 }
 
 buffer_proc
@@ -334,6 +340,9 @@ buffer_process(buffer     *b,
                 } else if (TAB(ch)) {
                         tab(b);
                         return BP_INSERT;
+                } else if (ch == CTRL_K) {
+                        delete_until_eol(b);
+                        return BP_INSERT;
                 }
         } break;
         case INPUT_TYPE_ARROW: {
@@ -354,22 +363,36 @@ buffer_process(buffer     *b,
 }
 
 void
+buffer_dump_xy(const buffer *b)
+{
+        const str *s = &b->lns.data[b->al]->s;
+        if (!s) return;
+
+        size_t screen_y = b->cy - b->vscrloff;
+
+        gotoxy(0, screen_y);
+        printf("\x1b[K"); // clear rest of line
+        printf("%s", str_cstr(s));
+
+        gotoxy(b->cx - b->hscrloff, screen_y);
+        fflush(stdout);
+}
+
+void
 buffer_dump(const buffer *b)
 {
         clear_terminal();
 
-        size_t start;
-        size_t end;
-
-        start = b->vscrloff;
-        end   = start + b->parent->h;
-
-        if (end > b->lns.len)
-                end = b->lns.len;
+        size_t start = b->vscrloff;
+        size_t end   = start + b->parent->h;
+        if (end > b->lns.len) end = b->lns.len;
 
         for (size_t i = start; i < end; ++i) {
                 const line *l = b->lns.data[i];
                 if (!l) break;
+
+                gotoxy(0, i - b->vscrloff);
+                printf("\x1b[K");
                 printf("%s", str_cstr(&l->s));
         }
 
