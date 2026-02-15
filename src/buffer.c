@@ -429,7 +429,8 @@ kill_line(buffer *b)
         line_free(ln);
         dyn_array_rm_at(b->lns, b->al);
 
-        b->cx = 0;
+        b->cx       = 0;
+        b->wish_col = 0;
 }
 
 static void
@@ -467,7 +468,33 @@ jump_next_word(buffer *b)
 static void
 jump_prev_word(buffer *b)
 {
-        assert(0);
+        const line *ln;
+        const str  *s;
+        const char *sraw;
+        int         hitchars;
+        size_t      i;
+
+        ln       = b->lns.data[b->al];
+        s        = &ln->s;
+        sraw     = str_cstr(s);
+        hitchars = 0;
+        i        = b->cx-1;
+
+        if (str_len(s) == 0 || b->cx == 0)
+                return;
+
+        while (i > 0) {
+                if (isalnum(sraw[i]))
+                        hitchars = 1;
+                else if (hitchars)
+                        break;
+                --i;
+        }
+
+        b->cx = i;
+
+        if (!isalnum(sraw[b->cx]))
+                ++b->cx;
 }
 
 buffer_proc
@@ -542,7 +569,6 @@ buffer_process(buffer     *b,
                         return BP_MOV;
                 } else if (ch == 'b') {
                         jump_prev_word(b);
-                        assert(0);
                         return BP_MOV;
                 }
         } break;
