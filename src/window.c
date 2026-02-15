@@ -84,7 +84,7 @@ window_handle(window *win)
 
                 ty = get_input(&ch);
 
-                if (ty == INPUT_TYPE_ALT)
+                if (ty == INPUT_TYPE_ALT && ch == 'x')
                         assert(0);
                 else if (ty == INPUT_TYPE_CTRL && ch == CTRL_X)
                         ctrlx(win);

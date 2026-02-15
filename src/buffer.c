@@ -325,6 +325,48 @@ delete_until_eol(buffer *b)
         str_insert(&ln->s, b->cx, 10);
 }
 
+static void
+jump_to_first_char(buffer *b)
+{
+        const str  *s;
+        const char *sraw;
+
+        s    = &b->lns.data[b->al]->s;
+        sraw = str_cstr(s);
+
+        for (size_t i = 0; i < str_len(s); ++i) {
+                if (sraw[i] != ' ' && sraw[i] != '\n' && sraw[i] != '\t' && sraw[i] != '\r') {
+                        b->cx = i;
+                        break;
+                }
+        }
+
+        b->wish_col = b->cx;
+
+        gotoxy(b->cx - b->hscrloff, b->cy - b->vscrloff);
+}
+
+static void
+buffer_bof(buffer *b)
+{
+        if (b->lns.len == 0) // not sure if this is required, but doesn't hurt
+                return;
+
+        b->cy = b->lns.len-1;
+        b->cx = 0;
+        b->al = b->lns.len-1;
+        adjust_scroll(b);
+}
+
+static void
+buffer_tof(buffer *b)
+{
+        b->cy = 0;
+        b->cx = 0;
+        b->al = 0;
+        adjust_scroll(b);
+}
+
 buffer_proc
 buffer_process(buffer     *b,
                input_type  ty,
@@ -342,22 +384,22 @@ buffer_process(buffer     *b,
         switch (ty) {
         case INPUT_TYPE_CTRL: {
                 if (ch == CTRL_N) {
-                        movement_ar[1](b);
+                        buffer_down(b);
                         return BP_MOV;
                 } else if (ch == CTRL_P) {
-                        movement_ar[0](b);
+                        buffer_up(b);
                         return BP_MOV;
                 } else if (ch == CTRL_F) {
-                        movement_ar[2](b);
+                        buffer_right(b);
                         return BP_MOV;
                 } else if (ch == CTRL_B) {
-                        movement_ar[3](b);
+                        buffer_left(b);
                         return BP_MOV;
                 } else if (ch == CTRL_E) {
-                        movement_ar[4](b);
+                        buffer_eol(b);
                         return BP_MOV;
                 } else if (ch == CTRL_A) {
-                        movement_ar[5](b);
+                        buffer_bol(b);
                         return BP_MOV;
                 } else if (ch == CTRL_D) {
                         return del_char(b) ? BP_INSERTNL : BP_INSERT;
@@ -371,6 +413,18 @@ buffer_process(buffer     *b,
                         insert_char(b, 10, 0);
                         --b->cx;
                         return BP_INSERTNL;
+                }
+        } break;
+        case INPUT_TYPE_ALT: {
+                if (ch == 'm') {
+                        jump_to_first_char(b);
+                        return BP_MOV;
+                } else if (ch == '>') {
+                        buffer_bof(b);
+                        return BP_MOV;
+                } else if (ch == '<') {
+                        buffer_tof(b);
+                        return BP_MOV;
                 }
         } break;
         case INPUT_TYPE_ARROW: {
