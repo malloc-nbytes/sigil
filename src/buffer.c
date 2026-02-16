@@ -571,7 +571,8 @@ del_word(buffer *b)
 }
 
 static void
-goto_search_forward(buffer *b)
+goto_search_forward(buffer *b,
+                    int     search_next)
 {
         for (size_t i = b->al; i < b->lns.len; ++i) {
                 const str *s;
@@ -622,16 +623,18 @@ search(buffer *b)
         int         old_cx;
         int         old_cy;
         int         old_al;
+        int         search_next;
 
-        input    = &b->last_search;
-        b->state = BS_SEARCH;
-        first    = 1;
-        old_cx   = b->cx;
-        old_cy   = b->cy;
-        old_al   = b->al;
+        input       = &b->last_search;
+        b->state    = BS_SEARCH;
+        first       = 1;
+        old_cx      = b->cx;
+        old_cy      = b->cy;
+        old_al      = b->al;
+        search_next = 0;
 
         while (1) {
-                goto_search_forward(b);
+                goto_search_forward(b, search_next);
                 if (!first) {
                         center_view(b);
                 }
@@ -659,6 +662,8 @@ search(buffer *b)
                                 b->cx = old_cx; b->cy = old_cy; b->al = old_al;
                                 str_append(input, ch);
                         }
+                } else if (ty == INPUT_TYPE_CTRL && ch == CTRL_S) {
+                        goto_search_forward(b, ++search_next);
                 } else {
                         b->cx = old_cx; b->cy = old_cy; b->al = old_al;
                         break;
