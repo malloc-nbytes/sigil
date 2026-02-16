@@ -133,7 +133,7 @@ str_rm(str *s, size_t i)
 char
 str_at(const str *s, size_t i)
 {
-        assert(i < s->len-1);
+        assert(i < s->len);
 
         return s->chars[i];
 }

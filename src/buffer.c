@@ -9,8 +9,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <limits.h>
 #include <ctype.h>
+
+#ifdef __linux__
+#include <limits.h>
+#else
+#define PATH_MAX 4096
+#endif
 
 static void
 draw_status(const buffer *b,
@@ -330,11 +335,18 @@ static void
 delete_until_eol(buffer *b)
 {
         line *ln;
+        const str *s;
 
         ln = b->lns.data[b->al];
+        s  = &ln->s;
+
+        for (size_t i = 0; i < str_len(s)-1; ++i)
+                dyn_array_append(g_cpy_buf, str_at(s, i));
 
         str_cut(&ln->s, b->cx);
         str_insert(&ln->s, b->cx, 10);
+
+        append_cpy(b);
 }
 
 static void
@@ -431,11 +443,16 @@ static void
 kill_line(buffer *b)
 {
         line *ln;
+        const str *s;
 
         if (b->lns.len <= 0)
                 return;
 
         ln = b->lns.data[b->al];
+        s  = &ln->s;
+
+        for (size_t i = 0; i < str_len(s); ++i)
+                dyn_array_append(g_cpy_buf, str_at(s, i));
 
         line_free(ln);
         dyn_array_rm_at(b->lns, b->al);
@@ -449,6 +466,8 @@ kill_line(buffer *b)
         b->wish_col = 0;
 
         adjust_scroll(b);
+
+        append_cpy(b);
 }
 
 static void
@@ -564,6 +583,22 @@ center_view(buffer *b)
         adjust_scroll(b);
 }
 
+static int
+paste(buffer *b)
+{
+        int newline;
+
+        newline = 0;
+
+        for (size_t i = 0; i < b->cpy.len; ++i) {
+                insert_char(b, b->cpy.chars[i], 1);
+                if (b->cpy.chars[i] == '\n')
+                        newline = 1;
+        }
+
+        return newline;
+}
+
 buffer_proc
 buffer_process(buffer     *b,
                input_type  ty,
@@ -615,6 +650,8 @@ buffer_process(buffer     *b,
                 } else if (ch == CTRL_L) {
                         center_view(b);
                         return BP_MOV;
+                } else if (ch == CTRL_Y) {
+                        return paste(b) ? BP_INSERTNL : BP_INSERT;
                 }
         } break;
         case INPUT_TYPE_ALT: {
