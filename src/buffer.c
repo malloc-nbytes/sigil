@@ -342,7 +342,7 @@ delete_until_eol(buffer *b)
         ln = b->lns.data[b->al];
         s  = &ln->s;
 
-        for (size_t i = 0; i < str_len(s)-1; ++i)
+        for (size_t i = b->cx; i < str_len(s)-1; ++i)
                 dyn_array_append(g_cpy_buf, str_at(s, i));
 
         str_cut(&ln->s, b->cx);
