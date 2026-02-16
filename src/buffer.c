@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <stdint.h>
 
 #ifdef __linux__
 #include <limits.h>
@@ -41,6 +42,78 @@ append_cpy(buffer *b)
         dyn_array_clear(g_cpy_buf);
 }
 
+static void
+append_line_range_to_clipboard(line *ln, size_t from, size_t to) {
+        if (!ln || from >= str_len(&ln->s)) return;
+        if (to > str_len(&ln->s)) to = str_len(&ln->s);
+        if (from >= to) return;
+
+        for (size_t i = from; i < to; ++i) {
+                dyn_array_append(g_cpy_buf, str_at(&ln->s, i));
+        }
+}
+
+static void
+copy_selection(buffer *b) {
+        if (b->state != BS_SELECTION) {
+                dyn_array_clear(g_cpy_buf);
+                append_cpy(b);
+                return;
+        }
+
+        dyn_array_clear(g_cpy_buf);
+
+        size_t anchor_y = (size_t)b->sy;
+        size_t anchor_x = (size_t)b->sx;
+        size_t cursor_y = b->al;
+        size_t cursor_x = b->cx;
+
+        // normalize
+        bool forward = (anchor_y < cursor_y) ||
+                (anchor_y == cursor_y && anchor_x <= cursor_x);
+
+        size_t start_y = forward ? anchor_y : cursor_y;
+        size_t end_y   = forward ? cursor_y   : anchor_y;
+        size_t start_x = forward ? anchor_x : cursor_x;
+        size_t end_x   = forward ? cursor_x : anchor_x;
+
+        // invalid line numbers
+        if (start_y >= b->lns.len || end_y >= b->lns.len) {
+                append_cpy(b);
+                return;
+        }
+
+        if (start_y == end_y) {
+                // single line selection
+                line *ln = b->lns.data[start_y];
+                append_line_range_to_clipboard(ln, start_x, end_x);
+        }
+        else {
+                // multi-line selection
+
+                // first (partial) line: start_x -> end of line
+                {
+                        line *ln = b->lns.data[start_y];
+                        append_line_range_to_clipboard(ln, start_x, SIZE_MAX);
+                        //dyn_array_append(g_cpy_buf, '\n');
+                }
+
+                // middle full lines
+                for (size_t y = start_y + 1; y < end_y; ++y) {
+                        line *ln = b->lns.data[y];
+                        append_line_range_to_clipboard(ln, 0, SIZE_MAX);
+                }
+
+                // last (partial) line: beginning -> end_x
+                {
+                        line *ln = b->lns.data[end_y];
+                        append_line_range_to_clipboard(ln, 0, end_x);
+                }
+        }
+
+        append_cpy(b);
+}
+
 buffer *
 buffer_alloc(window *parent)
 {
@@ -58,7 +131,9 @@ buffer_alloc(window *parent)
         b->saved       = 1;
         b->state       = BS_NORMAL;
         b->last_search = str_create();
-        b->cpy      = str_create();
+        b->cpy         = str_create();
+        b->sy          = 0;
+        b->sx          = 0;
 
         return b;
 }
@@ -267,9 +342,97 @@ insert_char(buffer *b,
         adjust_scroll(b);
 }
 
+static void
+del_selection(buffer *b)
+{
+        if (b->state != BS_SELECTION)
+                return;
+
+        size_t anchor_y = (size_t)b->sy;
+        size_t anchor_x = (size_t)b->sx;
+        size_t cursor_y = b->al;
+        size_t cursor_x = b->cx;
+
+        // normalize
+        bool forward = (anchor_y < cursor_y) ||
+                (anchor_y == cursor_y && anchor_x <= cursor_x);
+
+        size_t start_y = forward ? anchor_y : cursor_y;
+        size_t end_y   = forward ? cursor_y   : anchor_y;
+        size_t start_x = forward ? anchor_x : cursor_x;
+        size_t end_x   = forward ? cursor_x : anchor_x;
+
+        if (start_y >= b->lns.len || end_y >= b->lns.len)
+                goto cleanup;
+
+        b->saved = 0;
+
+        if (start_y == end_y) {
+                // single-line deletion
+                line *ln = b->lns.data[start_y];
+
+                size_t remove_count = end_x - start_x;
+                for (size_t i = 0; i < remove_count; ++i)
+                        str_rm(&ln->s, start_x);
+
+                b->cx = start_x;
+                b->al = start_y;
+                b->cy = start_y;
+        } else {
+                // multi-line deletion
+
+                // first line
+                {
+                        line *first = b->lns.data[start_y];
+                        size_t len_first = str_len(&first->s);
+                        if (start_x < len_first) {
+                                while (str_len(&first->s) > start_x)
+                                        str_rm(&first->s, start_x);
+                        }
+                }
+
+                // last line
+                {
+                        line *last = b->lns.data[end_y];
+                        for (size_t i = 0; i < end_x; ++i)
+                                str_rm(&last->s, 0);
+                }
+
+                // delete all middle lines
+                size_t lines_to_remove = end_y - start_y - 1;
+                for (size_t i = 0; i < lines_to_remove; ++i) {
+                        line_free(b->lns.data[start_y + 1]);
+                        dyn_array_rm_at(b->lns, start_y + 1);
+                }
+
+                // join the first and last lines
+                line *first = b->lns.data[start_y];
+                line *last  = b->lns.data[start_y + 1];
+
+                str_concat(&first->s, str_cstr(&last->s));
+                line_free(last);
+                dyn_array_rm_at(b->lns, start_y + 1);
+
+                // place cursor at the join point
+                b->cx = start_x;
+                b->al = start_y;
+                b->cy = start_y;
+        }
+
+ cleanup:
+        b->wish_col = b->cx;
+        b->state = BS_NORMAL;
+        adjust_scroll(b);
+}
+
 static int
 del_char(buffer *b)
 {
+        if (b->state == BS_SELECTION) {
+                del_selection(b);
+                return 1;
+        }
+
         line *ln;
         int   newline;
 
@@ -791,6 +954,26 @@ page_up(buffer *b)
         adjust_scroll(b);
 }
 
+static void
+selection(buffer *b)
+{
+        if (b->state == BS_NORMAL)
+                b->state = BS_SELECTION;
+        else if (b->state == BS_SELECTION)
+                b->state = BS_NORMAL;
+        else
+                return;
+
+        b->sy = b->al;
+        b->sx = b->cx;
+}
+
+static void
+cancel(buffer *b)
+{
+        b->state = BS_NORMAL;
+}
+
 // entrypoint
 buffer_proc
 buffer_process(buffer     *b,
@@ -851,6 +1034,9 @@ buffer_process(buffer     *b,
                 } else if (ch == CTRL_V) {
                         page_down(b);
                         return BP_INSERTNL;
+                } else if (ch == CTRL_G) {
+                        cancel(b);
+                        return BP_MOV;
                 }
 
         } break;
@@ -888,6 +1074,10 @@ buffer_process(buffer     *b,
                 } else if (ch == 'v') {
                         page_up(b);
                         return BP_INSERTNL;
+                } else if (ch == 'w') {
+                        copy_selection(b);
+                        cancel(b);
+                        return BP_MOV;
                 }
         } break;
         case INPUT_TYPE_ARROW: {
@@ -897,8 +1087,10 @@ buffer_process(buffer     *b,
         case INPUT_TYPE_NORMAL: {
                 if (BACKSPACE(ch))
                         return backspace(b) ? BP_INSERTNL : BP_INSERT;
-                else if (ch == 0) // ctrl+space
-                        break;
+                else if (ch == 0) { // ctrl+space
+                        selection(b);
+                        return BP_INSERTNL;
+                }
                 insert_char(b, ch, 1);
                 return ch == 10 ? BP_INSERTNL : BP_INSERT;
         } break;
@@ -995,6 +1187,51 @@ drawln(const buffer *b,
                 }
 
                 dyn_array_free(matches);
+                goto done;
+        } else if (b->state == BS_SELECTION) {
+                int selection_active = 1;
+
+                size_t anchor_y = b->sy;
+                size_t cursor_y = b->al;
+                size_t anchor_x = b->sx;
+                size_t cursor_x = b->cx;
+
+                int forward = (anchor_y < cursor_y) ||
+                        (anchor_y == cursor_y && anchor_x <= cursor_x);
+
+                size_t start_y = forward ? anchor_y : cursor_y;
+                size_t end_y   = forward ? cursor_y : anchor_y;
+                size_t start_x = forward ? anchor_x : cursor_x;
+                size_t end_x   = forward ? cursor_x : anchor_x;
+
+                int is_start_line  = (lineno == start_y);
+                int is_end_line    = (lineno == end_y);
+                int is_middle_line = (lineno > start_y && lineno < end_y);
+
+                for (size_t i = 0; i < str_len(s); ++i) {
+                        bool in_selection = false;
+
+                        if (is_middle_line) {
+                                // whole line is selected
+                                in_selection = true;
+                        } else if (is_start_line && is_end_line) {
+                                // selection starts and ends on same line
+                                in_selection = (i >= start_x && i < end_x);
+                        } else if (is_start_line) {
+                                // only beginning of selection
+                                in_selection = (i >= start_x);
+                        } else if (is_end_line) {
+                                // only end of selection
+                                in_selection = (i < end_x);
+                        }
+
+                        if (in_selection) {
+                                printf(INVERT "%c", str_at(s, i));
+                        } else {
+                                printf(RESET "%c", str_at(s, i));
+                        }
+                }
+
                 goto done;
         }
 
