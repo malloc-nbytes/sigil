@@ -137,3 +137,24 @@ str_at(const str *s, size_t i)
 
         return s->chars[i];
 }
+
+char
+str_pop(str *s)
+{
+        char ch;
+
+        if (s->len <= 0)
+                return 0;
+
+        ch = s->chars[s->len-1];
+        str_rm(s, s->len-1);
+
+        return ch;
+}
+
+void
+str_trim_before(str *s)
+{
+        while (s->len > 0 && s->chars[0] == ' ')
+                str_rm(s, 0);
+}

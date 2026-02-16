@@ -599,6 +599,33 @@ paste(buffer *b)
         return newline;
 }
 
+static void
+combine_lines(buffer *b)
+{
+        line   *l0;
+        line   *l1;
+        str    *s0;
+        str    *s1;
+        size_t len;
+
+        if (b->al >= b->lns.len-1)
+                return;
+
+        l0 = b->lns.data[b->al];
+        s0 = &l0->s;
+        l1 = b->lns.data[b->al+1];
+        s1 = &l1->s;
+        len = str_len(s0);
+
+        s0->chars[s0->len-1] = ' ';
+        str_trim_before(s1);
+        str_concat(s0, str_cstr(s1));
+        dyn_array_rm_at(b->lns, b->al+1);
+
+        b->cx = len-1;
+        b->wish_col = b->cx;
+}
+
 buffer_proc
 buffer_process(buffer     *b,
                input_type  ty,
@@ -682,6 +709,9 @@ buffer_process(buffer     *b,
                 } else if (ch == 'd') {
                         del_word(b);
                         return BP_INSERT;
+                } else if (ch == 'j') {
+                        combine_lines(b);
+                        return BP_INSERTNL;
                 }
         } break;
         case INPUT_TYPE_ARROW: {
