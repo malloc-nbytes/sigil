@@ -667,7 +667,7 @@ buffer_process(buffer     *b,
 }
 
 static void
-drawln(const buffer *b,
+drawln2(const buffer *b,
        const str    *s)
 {
         int         space;
@@ -691,6 +691,91 @@ drawln(const buffer *b,
                         putchar(sraw[i]);
                 printf(GRAY);
                 for (size_t i = 0; i < str_len(s)-space-1; ++i)
+                        putchar('-');
+                printf(RESET);
+        }
+}
+
+static bool
+is_identifier_char(char c)
+{
+        return isalnum(c) || c == '_';
+}
+
+static void
+drawln(const buffer *b,
+       const str    *s)
+{
+        const char *query;
+        const char *sraw;
+        size_t slen;
+        size_t qlen;
+
+        if (b->last_search.len > 0)
+                query = str_cstr(&b->last_search);
+        else
+                query = NULL;
+
+        if (!query || *query == '\0') {
+                drawln2(b, s);
+                return;
+        }
+
+        sraw = str_cstr(s);
+        slen = str_len(s);
+        qlen = strlen(query);
+
+        // Find last non-whitespace
+        ptrdiff_t last = -1;
+        for (ptrdiff_t i = (ptrdiff_t)slen - 1; i >= 0; --i) {
+                if (sraw[i] == '\n') continue;
+                if (!isspace((unsigned char)sraw[i])) {
+                        last = i;
+                        break;
+                }
+        }
+
+        if (last < 0) {
+                printf("%s", sraw);
+                return;
+        }
+
+        size_t i = 0;
+        while (i <= (size_t)last) {
+                //if (sraw[i] == '\n') {
+                //        putchar('\n');
+                //        i++;
+                //        continue;
+                //}
+
+                if (is_identifier_char(sraw[i])) {
+                        size_t start = i;
+
+                        // consume whole identifier
+                        while (i <= (size_t)last && is_identifier_char(sraw[i]))
+                                i++;
+
+                        size_t id_len = i - start;
+
+                        // highlight if exact match
+                        if (id_len == qlen && memcmp(sraw + start, query, qlen) == 0) {
+                                printf(INVERT YELLOW);
+                                fwrite(sraw + start, 1, id_len, stdout);
+                                printf(RESET);
+                        } else {
+                                fwrite(sraw + start, 1, id_len, stdout);
+                        }
+                } else {
+                        // punctuation, space, operator, etc.
+                        putchar(sraw[i]);
+                        i++;
+                }
+        }
+
+        // trailing whitespace
+        if ((size_t)last + 1 < slen-1) {
+                printf(GRAY);
+                for (size_t j = (size_t)last + 1; j < slen-1; ++j)
                         putchar('-');
                 printf(RESET);
         }
