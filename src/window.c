@@ -4,6 +4,7 @@
 #include "trie.h"
 #include "str.h"
 #include "colors.h"
+#include "fuzzy.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -151,10 +152,8 @@ completion_draw(window *win,
 static char *
 completion_run(window *win,
                const char *label,
-               void *trie)
+               cstr_array items)
 {
-        /* Runs completion UI. Returns selected string or NULL. */
-
         completion_state st;
         st.input = str_create();
         st.selected_idx = 0;
@@ -164,17 +163,18 @@ completion_run(window *win,
                 char ch;
                 input_type ty;
 
-                size_t total_matches = 0;
+                cstr_array matches =
+                        fuzzy_find(items, str_cstr(&st.input));
 
-                char **completions = trie_get_completions(trie,
-                                                          str_cstr(&st.input),
-                                                          MAX_COMPLETIONS_REQUEST,
-                                                          &total_matches);
+                size_t total_matches = matches.len;
+
+                if (total_matches > MAX_COMPLETIONS_REQUEST)
+                        total_matches = MAX_COMPLETIONS_REQUEST;
 
                 completion_draw(win,
                                 label,
                                 &st,
-                                completions,
+                                matches.data,
                                 total_matches);
 
                 ty = get_input(&ch);
@@ -184,8 +184,9 @@ completion_run(window *win,
                         if (ENTER(ch)) {
                                 if (total_matches > 0 &&
                                     st.selected_idx < total_matches) {
-                                        char *res = strdup(completions[st.selected_idx]);
-                                        free(completions);
+                                        char *res =
+                                                strdup(matches.data[st.selected_idx]);
+                                        dyn_array_free(matches);
                                         str_destroy(&st.input);
                                         return res;
                                 }
@@ -204,15 +205,15 @@ completion_run(window *win,
 
                 case INPUT_TYPE_CTRL:
                         if (ch == CTRL_N) {
-                                if (total_matches > 0
-                                    && st.selected_idx < total_matches - 1)
+                                if (total_matches > 0 &&
+                                    st.selected_idx < total_matches - 1)
                                         st.selected_idx++;
                         } else if (ch == CTRL_P) {
-                                if (total_matches > 0
-                                    && st.selected_idx > 0)
+                                if (total_matches > 0 &&
+                                    st.selected_idx > 0)
                                         st.selected_idx--;
                         } else if (ch == CTRL_G) {
-                                free(completions);
+                                dyn_array_free(matches);
                                 str_destroy(&st.input);
                                 return NULL;
                         }
@@ -221,7 +222,7 @@ completion_run(window *win,
                 default: break;
                 }
 
-                free(completions);
+                dyn_array_free(matches);
         }
 }
 
@@ -299,22 +300,14 @@ void
 find_file(window *win)
 {
         cstr_array files;
-        void *trie;
         char *chosen_file = NULL;
         str cwd = str_from(".");
 
  reload_dir:
 
         files = lsdir(str_cstr(&cwd));
-        trie = trie_alloc();
+        char *selected = completion_run(win, "Find File", files);
 
-        for (size_t i = 0; i < files.len; ++i)
-                trie_insert(trie, files.data[i]);
-
-        char *selected =
-                completion_run(win,
-                               "Find File",
-                               trie);
 
         if (!selected)
                 goto done;
@@ -330,7 +323,6 @@ find_file(window *win)
                 }
 
                 free(selected);
-                trie_destroy(trie);
                 dyn_array_free(files);
                 goto reload_dir;
         }
@@ -344,7 +336,6 @@ find_file(window *win)
                 cwd = fullpath;
 
                 free(selected);
-                trie_destroy(trie);
                 dyn_array_free(files);
                 goto reload_dir;
         }
@@ -355,7 +346,6 @@ find_file(window *win)
         free(selected);
 
  done:
-        trie_destroy(trie);
         dyn_array_free(files);
         str_destroy(&cwd);
 
@@ -378,12 +368,14 @@ find_file(window *win)
 static void
 choose_buffer(window *win)
 {
-        void *trie = trie_alloc();
+        cstr_array names = dyn_array_empty(cstr_array);
 
         for (size_t i = 0; i < win->bfrs.len; ++i)
-                trie_insert(trie, str_cstr(&win->bfrs.data[i]->filename));
+                dyn_array_append(names, strdup(str_cstr(&win->bfrs.data[i]->filename)));
 
-        char *selected = completion_run(win, "Switch Buffer", trie);
+        char *selected = completion_run(win,
+                                        "Switch Buffer",
+                                        names);
 
         if (!selected)
                 goto done;
@@ -392,7 +384,10 @@ choose_buffer(window *win)
         free(selected);
 
  done:
-        trie_destroy(trie);
+        for (size_t i = 0; i < names.len; ++i)
+                free(names.data[i]);
+        dyn_array_free(names);
+
         buffer_dump(win->ab);
 }
 
