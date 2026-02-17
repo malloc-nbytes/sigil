@@ -124,6 +124,17 @@ copy_selection(buffer *b) {
         }
 }
 
+static int
+writable(buffer *b)
+{
+        if (!b->writable) {
+                draw_status(b, "buffer is read-only");
+                buffer_dump(b);
+                return 0;
+        }
+        return 1;
+}
+
 buffer *
 buffer_alloc(window     *parent)
 {
@@ -145,6 +156,7 @@ buffer_alloc(window     *parent)
         b->cpy         = str_create();
         b->sy          = 0;
         b->sx          = 0;
+        b->writable    = 1;
 
         return b;
 }
@@ -152,6 +164,9 @@ buffer_alloc(window     *parent)
 int
 buffer_save(buffer *b)
 {
+        if (!writable(b))
+                return 0;
+
         char_array content = dyn_array_empty(char_array);
         for (size_t i = 0; i < b->lns.len; ++i) {
                 const line *ln = b->lns.data[i];
@@ -335,6 +350,9 @@ insert_char(buffer *b,
             char    ch,
             int     newline_advance)
 {
+        if (!writable(b))
+                return;
+
         b->saved = 0;
 
         if (!b->lns.data) {
@@ -452,6 +470,9 @@ del_selection(buffer *b)
 static int
 del_char(buffer *b)
 {
+        if (!writable(b))
+                return 0;
+
         if (b->state == BS_SELECTION) {
                 del_selection(b);
                 return 1;
@@ -486,6 +507,9 @@ del_char(buffer *b)
 static int
 backspace(buffer *b)
 {
+        if (!writable(b))
+                return 0;
+
         line *ln;
         int   newline;
 
@@ -903,6 +927,9 @@ search(buffer *b, int reverse)
 static int
 paste(buffer *b)
 {
+        if (!writable(b))
+                return 0;
+
         int newline;
 
         newline = 0;

@@ -40,6 +40,7 @@ typedef struct {
         str          cpy;         // the copy buffer
         int          sy;          // the y position of selection mode
         int          sx;          // the x position of selection mode
+        int          writable;    // mutable buffer?
 } buffer;
 
 DYN_ARRAY_TYPE(buffer *, bufferp_array);

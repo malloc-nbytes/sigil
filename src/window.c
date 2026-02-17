@@ -549,6 +549,7 @@ do_compilation(window *win)
                 b = buffer_alloc(win);
                 str_destroy(&b->name);
                 b->name = str_from("ww-compilation");
+                b->writable = 0;
         } else {
                 exists = 1;
                 for (size_t i = 0; i < b->lns.len; ++i)
@@ -610,8 +611,10 @@ compilation_buffer(window *win)
                                 str_append(&input, ch);
                         break;
                 case INPUT_TYPE_CTRL:
-                        if (ch == CTRL_G)
+                        if (ch == CTRL_G) {
+                                str_clear(&input);
                                 goto done;
+                        }
                         break;
                 default: break;
                 }
@@ -620,6 +623,7 @@ compilation_buffer(window *win)
 done:
         if (input.len <= 0) {
                 str_destroy(&input);
+                buffer_dump(win->ab);
                 return;
         }
 
@@ -647,7 +651,7 @@ ctrlx(window *win)
         } break;
         case INPUT_TYPE_CTRL:
                 if (ch == CTRL_S)
-                        return save_buffer(win);
+                        save_buffer(win);
                 if (ch == CTRL_Q)
                         quit(win);
                 if (ch == CTRL_F)
@@ -670,6 +674,11 @@ window_handle(window *win)
         while (1) {
                 if (!win->ab)
                         break;
+
+                if (!win->pb) {
+                        win->pb = win->ab;
+                        win->pbi = win->abi;
+                }
 
                 char        ch;
                 input_type  ty;
