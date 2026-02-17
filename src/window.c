@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
 #define MAX_COMPLETIONS  200
 #define DISPLAY_COUNT     6
@@ -235,7 +237,21 @@ window_create(size_t w, size_t h)
                 .bfrs = dyn_array_empty(bufferp_array),
                 .w    = w,
                 .h    = h,
+                .compile = NULL,
+                .pb      = NULL,
+                .pbi     = 0,
         };
+}
+
+static int
+buffer_exists_by_name(window     *win,
+                      const char *name)
+{
+        for (size_t i = 0; i < win->bfrs.len; ++i) {
+                if (!strcmp(name, str_cstr(&win->bfrs.data[i]->name)))
+                        return 1;
+        }
+        return 0;
 }
 
 void
@@ -243,8 +259,11 @@ window_add_buffer(window *win,
                   buffer *b,
                   int     make_curr)
 {
-        dyn_array_append(win->bfrs, b);
+        if (!buffer_exists_by_name(win, str_cstr(&b->name)))
+                dyn_array_append(win->bfrs, b);
         if (make_curr) {
+                win->pb = win->ab;
+                win->pbi = win->abi;
                 win->ab  = b;
                 win->abi = win->bfrs.len-1;
         }
@@ -255,7 +274,9 @@ change_buffer_by_name(window     *win,
                       const char *name)
 {
         for (size_t i = 0; i < win->bfrs.len; ++i) {
-                if (!strcmp(str_cstr(&win->bfrs.data[i]->filename), name)) {
+                if (!strcmp(str_cstr(&win->bfrs.data[i]->name), name)) {
+                        win->pb = win->ab;
+                        win->pbi = win->abi;
                         win->abi = i;
                         win->ab = win->bfrs.data[i];
                         break;
@@ -371,11 +392,9 @@ choose_buffer(window *win)
         cstr_array names = dyn_array_empty(cstr_array);
 
         for (size_t i = 0; i < win->bfrs.len; ++i)
-                dyn_array_append(names, strdup(str_cstr(&win->bfrs.data[i]->filename)));
+                dyn_array_append(names, strdup(str_cstr(&win->bfrs.data[i]->name)));
 
-        char *selected = completion_run(win,
-                                        "Switch Buffer",
-                                        names);
+        char *selected = completion_run(win, "Switch Buffer", names);
 
         if (!selected)
                 goto done;
@@ -391,6 +410,230 @@ choose_buffer(window *win)
         buffer_dump(win->ab);
 }
 
+static char **
+make_command(str *s)
+{
+        cstr_array ar = dyn_array_empty(cstr_array);
+        char_array buf = dyn_array_empty(char_array);
+
+        for (size_t i = 0; i < s->len; ++i) {
+                char ch = str_at(s, i);
+                if (ch == ' ') {
+                        if (buf.len > 0) {
+                                dyn_array_append(buf, 0);
+                                dyn_array_append(ar, strdup(buf.data));
+                                dyn_array_clear(buf);
+                        }
+                } else {
+                        dyn_array_append(buf, ch);
+                }
+        }
+
+        if (buf.len > 0) {
+                dyn_array_append(buf, 0);
+                dyn_array_append(ar, strdup(buf.data));
+        }
+
+        dyn_array_append(ar, NULL);
+        dyn_array_free(buf);
+
+        return ar.data;
+}
+
+static char *
+capture_command_output(str *input)
+{
+        int pipefd[2];
+        pid_t pid;
+        char *output = NULL;
+        size_t output_size = 0;
+        size_t output_cap = 0;
+        char buffer[4096];
+
+        if (pipe(pipefd) == -1) {
+                perror("pipe");
+                return NULL;
+        }
+
+        pid = fork();
+        if (pid == -1) {
+                perror("fork");
+                close(pipefd[0]);
+                close(pipefd[1]);
+                return NULL;
+        }
+
+        if (pid == 0) {
+                // Child
+                close(pipefd[0]);
+
+                if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
+                        perror("dup2 stdout");
+                        _exit(1);
+                }
+
+                if (dup2(pipefd[1], STDERR_FILENO) == -1) {
+                        perror("dup2 stderr");
+                        _exit(1);
+                }
+
+                close(pipefd[1]);
+
+                char **args = make_command(input);
+                if (!args || !*args)
+                        _exit(127);
+
+                execvp(args[0], args);
+                perror("execvp");
+                fflush(stdout);
+                _exit(127);
+        }
+
+        // Parent
+        close(pipefd[1]);
+
+        // Read loop
+        ssize_t n;
+        while ((n = read(pipefd[0], buffer, sizeof(buffer) - 1)) > 0) {
+                buffer[n] = '\0';
+
+                size_t needed = output_size + n + 1;
+                if (needed > output_cap) {
+                        output_cap = needed * 2 < 8192 ? 8192 : needed * 2;
+                        char *new_out = realloc(output, output_cap);
+                        if (!new_out) {
+                                perror("realloc");
+                                free(output);
+                                close(pipefd[0]);
+                                waitpid(pid, NULL, 0);
+                                return NULL;
+                        }
+                        output = new_out;
+                }
+
+                memcpy(output + output_size, buffer, n);
+                output_size += n;
+                output[output_size] = '\0';
+        }
+
+        close(pipefd[0]);
+
+        int status;
+        waitpid(pid, &status, 0);
+
+        return output;
+}
+
+#define COMPILATION_HEADER "*** Compilation [ %s ] ***\n\n"
+
+static void
+do_compilation(window *win)
+{
+        if (!win->compile)
+                return;
+
+        str input = str_from(win->compile);
+        buffer *b = NULL;
+        int exists = 0;
+
+        for (size_t i = 0; i < win->bfrs.len; ++i) {
+                if (!strcmp(str_cstr(&win->bfrs.data[i]->name), "ww-compilation")) {
+                        b = win->bfrs.data[i];
+                        win->ab = b;
+                        win->abi = i;
+                        break;
+                }
+        }
+
+        if (!b) {
+                b = buffer_alloc(win);
+                str_destroy(&b->name);
+                b->name = str_from("ww-compilation");
+                b->writable = 0;
+        } else {
+                exists = 1;
+                for (size_t i = 0; i < b->lns.len; ++i)
+                        line_free(b->lns.data[i]);
+                dyn_array_free(b->lns);
+        }
+
+        if (!exists)
+                window_add_buffer(win, b, 1);
+        buffer_dump(win->ab);
+
+        char *output = capture_command_output(&input);
+        win->ab->lns = lines_of_cstr(output);
+
+        char buf[1024] = {0};
+        sprintf(buf, COMPILATION_HEADER, str_cstr(&input));
+        line_array header = lines_of_cstr(buf);
+        for (int i = header.len-1; i >= 0; --i)
+                dyn_array_insert_at(win->ab->lns, 0, header.data[i]);
+
+        dyn_array_append(win->ab->lns, line_from(str_from("\n")));
+        dyn_array_append(win->ab->lns, line_from(str_from("[ Done ] ")));
+        win->ab->cx = 0;
+        win->ab->al = 0;
+        win->ab->cy = 0;
+        adjust_scroll(win->ab);
+
+        str_destroy(&input);
+        buffer_dump(win->ab);
+}
+
+static void
+compilation_buffer(window *win)
+{
+        str input;
+
+        if (win->compile)
+                input = str_from(win->compile);
+        else
+                input = str_create();
+
+        while (1) {
+                gotoxy(0, win->h);
+                clear_line(0, win->h);
+                printf("Compile [ %s", str_cstr(&input));
+                fflush(stdout);
+
+                char       ch;
+                input_type ty;
+
+                ty = get_input(&ch);
+                switch (ty) {
+                case INPUT_TYPE_NORMAL:
+                        if (ch == '\n')
+                                goto done;
+                        else if (BACKSPACE(ch))
+                                str_pop(&input);
+                        else
+                                str_append(&input, ch);
+                        break;
+                case INPUT_TYPE_CTRL:
+                        if (ch == CTRL_G) {
+                                str_clear(&input);
+                                goto done;
+                        }
+                        break;
+                default: break;
+                }
+        }
+
+done:
+        if (input.len <= 0) {
+                str_destroy(&input);
+                buffer_dump(win->ab);
+                return;
+        }
+
+        if (win->compile)
+                free(win->compile);
+
+        win->compile = strdup(str_cstr(&input));
+        do_compilation(win);
+}
+
 static int
 ctrlx(window *win)
 {
@@ -403,10 +646,12 @@ ctrlx(window *win)
                         close_buffer(win);
                 if (ch == 'b')
                         choose_buffer(win);
+                if (ch == 'x')
+                        compilation_buffer(win);
         } break;
         case INPUT_TYPE_CTRL:
                 if (ch == CTRL_S)
-                        return save_buffer(win);
+                        save_buffer(win);
                 if (ch == CTRL_Q)
                         quit(win);
                 if (ch == CTRL_F)
@@ -430,13 +675,28 @@ window_handle(window *win)
                 if (!win->ab)
                         break;
 
+                if (!win->pb) {
+                        win->pb = win->ab;
+                        win->pbi = win->abi;
+                }
+
                 char        ch;
                 input_type  ty;
                 buffer_proc bproc;
 
                 ty = get_input(&ch);
+                int is_compilation = !strcmp(str_cstr(&win->ab->name), "ww-compilation");
 
-                if (ty == INPUT_TYPE_ALT && ch == 'x')
+                if (ty == INPUT_TYPE_NORMAL && ch == 'q' && is_compilation) {
+                        win->ab = win->pb;
+                        win->abi = win->pbi;
+                        buffer_dump(win->ab);
+                } else if (ty == INPUT_TYPE_ALT && ch == '\t') {
+                        change_buffer_by_name(win, "ww-compilation");
+                        buffer_dump(win->ab);
+                } else if (ty == INPUT_TYPE_NORMAL && ch == 'g' && is_compilation)
+                        do_compilation(win);
+                else if (ty == INPUT_TYPE_ALT && ch == 'x')
                         assert(0);
                 else if (ty == INPUT_TYPE_CTRL && ch == CTRL_X)
                         ctrlx(win);

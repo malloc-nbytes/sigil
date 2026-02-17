@@ -124,11 +124,23 @@ copy_selection(buffer *b) {
         }
 }
 
+static int
+writable(buffer *b)
+{
+        if (!b->writable) {
+                draw_status(b, "buffer is read-only");
+                buffer_dump(b);
+                return 0;
+        }
+        return 1;
+}
+
 buffer *
-buffer_alloc(window *parent)
+buffer_alloc(window     *parent)
 {
         buffer *b = (buffer *)malloc(sizeof(buffer));
 
+        b->name        = str_create();
         b->filename    = str_create();
         b->lns         = dyn_array_empty(line_array);
         b->cx          = 0;
@@ -144,6 +156,7 @@ buffer_alloc(window *parent)
         b->cpy         = str_create();
         b->sy          = 0;
         b->sx          = 0;
+        b->writable    = 1;
 
         return b;
 }
@@ -151,6 +164,9 @@ buffer_alloc(window *parent)
 int
 buffer_save(buffer *b)
 {
+        if (!writable(b))
+                return 0;
+
         char_array content = dyn_array_empty(char_array);
         for (size_t i = 0; i < b->lns.len; ++i) {
                 const line *ln = b->lns.data[i];
@@ -177,6 +193,7 @@ buffer_from_file(str filename, window *parent)
         b = buffer_alloc(parent);
         str_destroy(&b->filename);
         b->filename = filename;
+        b->name = str_from(str_cstr(&b->filename));
 
         if (file_exists(str_cstr(&filename))) {
                 char       *file_data;
@@ -231,7 +248,7 @@ adjust_hscroll(buffer *b)
         return 0;
 }
 
-static int
+int
 adjust_scroll(buffer *b)
 {
         int res;
@@ -333,6 +350,9 @@ insert_char(buffer *b,
             char    ch,
             int     newline_advance)
 {
+        if (!writable(b))
+                return;
+
         b->saved = 0;
 
         if (!b->lns.data) {
@@ -450,6 +470,9 @@ del_selection(buffer *b)
 static int
 del_char(buffer *b)
 {
+        if (!writable(b))
+                return 0;
+
         if (b->state == BS_SELECTION) {
                 del_selection(b);
                 return 1;
@@ -478,12 +501,15 @@ del_char(buffer *b)
         if (b->cx > str_len(&ln->s)-1)
                 b->cx = str_len(&ln->s)-1;
 
-        return adjust_scroll(b);
+        return adjust_scroll(b) || newline;
 }
 
 static int
 backspace(buffer *b)
 {
+        if (!writable(b))
+                return 0;
+
         line *ln;
         int   newline;
 
@@ -901,6 +927,9 @@ search(buffer *b, int reverse)
 static int
 paste(buffer *b)
 {
+        if (!writable(b))
+                return 0;
+
         int newline;
 
         newline = 0;
@@ -1288,10 +1317,7 @@ drawln(const buffer *b,
         for (size_t i = 0; i < eol; ++i) {
                 if (sraw[i] == '\t')
                         printf(GRAY ">" RESET);
-                else if (isprint(sraw[i]))
-                        putchar(sraw[i]);
-                else
-                        printf(RED INVERT "%c" RESET, sraw[i]);
+                putchar(sraw[i]);
         }
 
 done:
@@ -1312,7 +1338,7 @@ draw_status(const buffer *b,
         printf(INVERT);
 
         sprintf(buf, "%s:%zu:%zu%s %s",
-                str_cstr(&b->filename),
+                str_cstr(&b->name),
                 b->cy+1,
                 b->cx+1,
                 !b->saved ? "*" : "",

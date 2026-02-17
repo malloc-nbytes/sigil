@@ -24,6 +24,7 @@ typedef enum {
 } buffer_state;
 
 typedef struct {
+        str          name;
         str          filename;    // file we are editing (if available)
         line_array   lns;         // lines
         size_t       cx;          // cursor x
@@ -39,6 +40,7 @@ typedef struct {
         str          cpy;         // the copy buffer
         int          sy;          // the y position of selection mode
         int          sx;          // the x position of selection mode
+        int          writable;    // mutable buffer?
 } buffer;
 
 DYN_ARRAY_TYPE(buffer *, bufferp_array);
@@ -49,5 +51,6 @@ buffer_proc  buffer_process(buffer *b, input_type ty, char ch);
 void         buffer_dump(const buffer *b);
 void         buffer_dump_xy(const buffer *b);
 int          buffer_save(buffer *b);
+int          adjust_scroll(buffer *b);
 
 #endif // BUFFER_H_INUCLUDED
