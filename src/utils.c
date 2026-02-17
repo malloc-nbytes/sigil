@@ -3,6 +3,7 @@
 #include <regex.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
 
 int
 doregex(const char *pattern,
@@ -23,4 +24,14 @@ doregex(const char *pattern,
 
         if (!reti) return 1;
         else return 0;
+}
+
+int
+cstr_isdigit(const char *s)
+{
+        for (size_t i = 0; s[i]; ++i) {
+                if (!isdigit(s[i]))
+                        return 0;
+        }
+        return 1;
 }

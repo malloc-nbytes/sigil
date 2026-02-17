@@ -1058,6 +1058,54 @@ cut_selection(buffer *b)
         del_selection(b);
 }
 
+static char *
+input_from_minibuffer(buffer *b)
+{
+        str input;
+
+        input = str_create();
+
+        while (1) {
+                gotoxy(0, b->parent->h);
+                clear_line(0, b->parent->h);
+                printf("[ %s", str_cstr(&input));
+                fflush(stdout);
+
+                char ch;
+                input_type ty;
+
+                switch (ty = get_input(&ch)) {
+                case INPUT_TYPE_NORMAL:
+                        if (ENTER(ch))
+                                break;
+                        if (BACKSPACE(ch))
+                                str_pop(&input);
+                        else
+                                str_append(&input, ch);
+                        break;
+                case INPUT_TYPE_CTRL:
+                        if (ch == CTRL_G) {
+                                str_destroy(&input);
+                                return NULL;
+                        }
+                        break;
+                }
+        }
+
+        return input.chars;
+}
+
+static void
+jump_to_line(buffer *b)
+{
+        char *input;
+
+        if (!(input = input_from_minibuffer(b)))
+                return;
+
+        assert(0);
+}
+
 // entrypoint
 buffer_proc
 buffer_process(buffer     *b,
@@ -1166,6 +1214,8 @@ buffer_process(buffer     *b,
                         copy_selection(b);
                         cancel(b);
                         return BP_INSERTNL;
+                } else if (ch == 'g') {
+                        jump_to_line(b);
                 }
         } break;
         case INPUT_TYPE_ARROW: {

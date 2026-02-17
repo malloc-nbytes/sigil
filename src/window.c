@@ -301,6 +301,9 @@ close_buffer(window *win)
 
         if (win->ab)
                 buffer_dump(win->ab);
+
+        win->pb = win->bfrs.data[0];
+        win->pbi = 0;
 }
 
 static void
