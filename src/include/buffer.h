@@ -41,6 +41,7 @@ typedef struct {
         int          sy;          // the y position of selection mode
         int          sx;          // the x position of selection mode
         int          writable;    // mutable buffer?
+        int          last_tab;    // was the last character inserted a tab?
 } buffer;
 
 DYN_ARRAY_TYPE(buffer *, bufferp_array);

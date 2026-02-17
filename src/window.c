@@ -524,7 +524,7 @@ capture_command_output(str *input)
         return output;
 }
 
-#define COMPILATION_HEADER "*** Compilation [ %s ] ***\n\n"
+#define COMPILATION_HEADER "*** Compilation [ %s ] [ (q)uit, a(g)ain, M-<tab>:switch-here ] ***\n\n"
 
 static void
 do_compilation(window *win)
@@ -691,7 +691,7 @@ window_handle(window *win)
                         win->ab = win->pb;
                         win->abi = win->pbi;
                         buffer_dump(win->ab);
-                } else if (ty == INPUT_TYPE_ALT && ch == '\t') {
+                } else if (ty == INPUT_TYPE_ALT && ch == '\t' && !is_compilation) {
                         change_buffer_by_name(win, "ww-compilation");
                         buffer_dump(win->ab);
                 } else if (ty == INPUT_TYPE_NORMAL && ch == 'g' && is_compilation)

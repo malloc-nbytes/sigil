@@ -157,6 +157,7 @@ buffer_alloc(window     *parent)
         b->sy          = 0;
         b->sx          = 0;
         b->writable    = 1;
+        b->last_tab    = 0;
 
         return b;
 }
@@ -536,11 +537,19 @@ backspace(buffer *b)
                 return 1;
         }
 
-        buffer_left(b);
-
-        str_rm(&ln->s, b->cx);
-        if (b->cx > str_len(&ln->s)-1)
-                b->cx = str_len(&ln->s)-1;
+        if (b->last_tab) {
+                for (size_t i = 0; i < 8; ++i) {
+                        buffer_left(b);
+                        str_rm(&ln->s, b->cx);
+                        if (b->cx > str_len(&ln->s)-1)
+                                b->cx = str_len(&ln->s)-1;
+                }
+        } else {
+                buffer_left(b);
+                str_rm(&ln->s, b->cx);
+                if (b->cx > str_len(&ln->s)-1)
+                        b->cx = str_len(&ln->s)-1;
+        }
 
         adjust_scroll(b);
         return newline;
@@ -549,6 +558,8 @@ backspace(buffer *b)
 static void
 tab(buffer *b)
 {
+        b->last_tab = 1;
+
         for (size_t i = 0; i < 8; ++i)
                 insert_char(b, ' ', 1);
 }
@@ -930,6 +941,8 @@ paste(buffer *b)
         if (!writable(b))
                 return 0;
 
+        b->last_tab = 0;
+
         int newline;
 
         newline = 0;
@@ -1087,6 +1100,8 @@ buffer_process(buffer     *b,
                 } else if (ch == CTRL_O) {
                         insert_char(b, 10, 0);
                         --b->cx;
+                        --b->wish_col;
+                        b->last_tab = 0;
                         return BP_INSERTNL;
                 } else if (ch == CTRL_H) {
                         return backspace(b) ? BP_INSERTNL : BP_INSERT;
@@ -1156,10 +1171,10 @@ buffer_process(buffer     *b,
                         return backspace(b) ? BP_INSERTNL : BP_INSERT;
                 else if (ch == 0) { // ctrl+space
                         selection(b);
-                        //return BP_INSERTNL;
                         return BP_MOV;
                 }
                 insert_char(b, ch, 1);
+                b->last_tab = 0;
                 return ch == 10 ? BP_INSERTNL : BP_INSERT;
         } break;
         default: break;
