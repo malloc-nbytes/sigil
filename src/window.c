@@ -637,6 +637,38 @@ done:
         do_compilation(win);
 }
 
+static void
+metax(window *win)
+{
+        // TODO: make `names' live in static memory
+        //       since we don't need to always refill it.
+
+        cstr_array  names;
+        char       *cmds[] = WINCMDS;
+        char       *selected;
+
+        names = dyn_array_empty(cstr_array);
+
+        for (size_t i = 0; i < sizeof(cmds)/sizeof(*cmds); ++i)
+                dyn_array_append(names, cmds[i]);
+
+        selected = completion_run(win, "M-x", names);
+
+        if (!strcmp(selected, WINCMD_SPCAMT)) {
+                assert(0 && "set space amount");
+        } else if (!strcmp(selected, WINCMD_KILLBUF)) {
+                close_buffer(win);
+        } else if (!strcmp(selected, WINCMD_SWTCHBUF)) {
+                choose_buffer(win);
+        } else if (!strcmp(selected, WINCMD_COMP)) {
+                compilation_buffer(win);
+        } else {
+                assert(0 && "unknown M-x command");
+        }
+
+        dyn_array_free(names);
+}
+
 static int
 ctrlx(window *win)
 {
@@ -700,7 +732,7 @@ window_handle(window *win)
                 } else if (ty == INPUT_TYPE_NORMAL && ch == 'g' && is_compilation)
                         do_compilation(win);
                 else if (ty == INPUT_TYPE_ALT && ch == 'x')
-                        assert(0);
+                        metax(win);
                 else if (ty == INPUT_TYPE_CTRL && ch == CTRL_X)
                         ctrlx(win);
                 else {

@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "str.h"
 
 #include <regex.h>
 #include <stdlib.h>
@@ -35,3 +36,4 @@ cstr_isdigit(const char *s)
         }
         return 1;
 }
+

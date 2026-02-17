@@ -1059,16 +1059,20 @@ cut_selection(buffer *b)
 }
 
 static char *
-input_from_minibuffer(buffer *b)
+input_from_minibuffer(buffer     *b,
+                      const char *prompt)
 {
         str input;
 
         input = str_create();
 
+        if (!prompt)
+                prompt = "";
+
         while (1) {
                 gotoxy(0, b->parent->h);
                 clear_line(0, b->parent->h);
-                printf("[ %s", str_cstr(&input));
+                printf("%s [ %s", prompt, str_cstr(&input));
                 fflush(stdout);
 
                 char ch;
@@ -1102,7 +1106,7 @@ jump_to_line(buffer *b)
         char *input;
         int   no;
 
-        if (!(input = input_from_minibuffer(b)))
+        if (!(input = input_from_minibuffer(b, "Lineno")))
                 return;
 
         if (!cstr_isdigit(input))

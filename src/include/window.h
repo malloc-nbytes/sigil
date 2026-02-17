@@ -5,15 +5,26 @@
 
 #include <stddef.h>
 
+#define WINCMD_SPCAMT   "set-space-amt"
+#define WINCMD_KILLBUF  "kill-buffer"
+#define WINCMD_SWTCHBUF "switch-buffer"
+#define WINCMD_COMP     "compile"
+#define WINCMDS { \
+        WINCMD_SPCAMT, \
+        WINCMD_KILLBUF, \
+        WINCMD_SWTCHBUF, \
+        WINCMD_COMP, \
+}
+
 typedef struct window {
-        buffer        *ab;   // active buffer (pointer)
-        size_t         abi;  // active buffer index
-        bufferp_array  bfrs; // buffers
-        size_t         w;    // window width
-        size_t         h;    // window height
+        buffer        *ab;      // active buffer (pointer)
+        size_t         abi;     // active buffer index
+        bufferp_array  bfrs;    // buffers
+        size_t         w;       // window width
+        size_t         h;       // window height
         char          *compile; // current compile command
-        buffer        *pb; // previous buffer (pointer)
-        size_t         pbi; // previous buffer index
+        buffer        *pb;      // previous buffer (pointer)
+        size_t         pbi;     // previous buffer index
 } window;
 
 window window_create(size_t w, size_t h);
