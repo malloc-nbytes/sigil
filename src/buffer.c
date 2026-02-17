@@ -275,7 +275,7 @@ buffer_up(buffer *b)
                 b->cx = b->wish_col;
 
         gotoxy(b->cx - b->hscrloff, b->cy - b->vscrloff);
-        return adjust_scroll(b);
+        return adjust_scroll(b) || b->state == BS_SELECTION;
 }
 
 static int
@@ -1245,7 +1245,7 @@ buffer_process(buffer     *b,
 
                 if (ch == 0) { // ctrl+space
                         selection(b);
-                        return BP_MOV;
+                        return BP_INSERTNL;
                 }
 
                 insert_char(b, ch, 1);
