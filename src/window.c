@@ -60,54 +60,134 @@ save_buffer(window *win)
                 return 0;
 }
 
+#define MAX_COMPLETIONS  200
+#define DISPLAY_COUNT     8
+#define MAX_COMPLETIONS_REQUEST  200
+#define MAX_VERTICAL_LINES        8
+
 void
 find_file(window *win)
 {
         cstr_array   files;
         void        *trie;
-        size_t       out_count;
-        char        *chosen_file;
+        char        *chosen_file = NULL;
         str          inbuf;
 
-        files       = lsdir(".");
-        trie        = trie_alloc();
-        out_count   = 0;
-        chosen_file = NULL;
-        inbuf       = str_create();
+        files = lsdir(".");
+        trie  = trie_alloc();
+        inbuf = str_create();
 
         for (size_t i = 0; i < files.len; ++i)
                 (void)trie_insert(trie, files.data[i]);
+
+        size_t selected_idx = 0;
+        size_t offset       = 0;
 
         while (1) {
                 char         ch;
                 input_type   ty;
                 char       **completions = NULL;
-                size_t       out_count = 0;
-                static size_t selected_idx = 0;
+                size_t       total_matches = 0;
 
-                completions = trie_get_completions(trie, str_cstr(&inbuf), 5, &out_count);
+                completions = trie_get_completions(trie, str_cstr(&inbuf),
+                                                   MAX_COMPLETIONS_REQUEST, &total_matches);
 
-                if (out_count > 0 && selected_idx >= out_count)
+                // Keep indices sane
+                if (total_matches == 0) {
                         selected_idx = 0;
+                        offset = 0;
+                } else {
+                        if (selected_idx >= total_matches)
+                                selected_idx = total_matches - 1;
+
+                        // for now we only show items from offset
+                        if (selected_idx < offset)
+                                offset = selected_idx;
+                        else if (selected_idx >= offset + MAX_VERTICAL_LINES)
+                                offset = selected_idx - MAX_VERTICAL_LINES + 1;
+
+                        size_t max_offset = total_matches > MAX_VERTICAL_LINES
+                                ? total_matches - MAX_VERTICAL_LINES : 0;
+                        if (offset > max_offset)
+                                offset = max_offset;
+                }
 
                 gotoxy(0, win->h);
                 clear_line(0, win->h);
-                printf("Find File [ %s", str_cstr(&inbuf));
+                printf("Find File [ %s ]", str_cstr(&inbuf));
+                if (total_matches > 0)
+                        printf("  (%zu/%zu)", selected_idx + 1, total_matches);
+                if (total_matches >= MAX_COMPLETIONS_REQUEST)
+                        printf("  [more…]");
 
-                gotoxy(0, win->h-1);
-                clear_line(0, win->h-1);
+                gotoxy(0, win->h - 1);
+                clear_line(0, win->h - 1);
 
-                for (size_t i = 0; i < out_count; ++i) {
-                        if (i > 0) putchar(' ');
+                if (total_matches == 0) {
+                        printf("(no matches)");
+                } else {
+                        size_t cursor_x = 0;
+                        size_t items_shown = 0;
+                        const size_t sep_len = strlen("  ");
 
-                        if (i == selected_idx) {
-                                printf(YELLOW BOLD);
+                        for (size_t i = offset; i < total_matches; ++i) {
+                                const char *name     = completions[i] ? completions[i] : "?";
+                                size_t      name_len = strlen(name);
+                                size_t      added    = name_len;
+
+                                // would this full name fit if we add it?
+                                size_t would_be = cursor_x;
+                                if (items_shown > 0)
+                                        would_be += sep_len;
+
+                                would_be += name_len;
+
+                                if (would_be > win->w) {
+                                        // Doesn't fit fully, truncate only this one
+                                        size_t remaining = win->w - cursor_x;
+                                        if (items_shown > 0)
+                                                remaining -= sep_len;
+
+                                        // need at least some chars + ellipsis
+                                        if (remaining < 4) {
+                                                // not even enough for "a..."
+                                                break;
+                                        }
+
+                                        size_t display_chars = remaining - 3;  // room for ...
+                                        if (display_chars < 1) display_chars = 1;
+
+                                        if (items_shown > 0)
+                                                printf("%s", "  ");
+
+                                        if (i == selected_idx)
+                                                printf(YELLOW BOLD INVERT);
+
+                                        printf("%.*s%s", (int)display_chars, name, "...");
+
+                                        if (i == selected_idx)
+                                                printf(RESET);
+
+                                        cursor_x = win->w;  // line is now full
+                                        items_shown++;
+                                        break;  // no more after truncated item
+                                }
+
+                                // Fits fully; print it
+                                if (items_shown > 0)
+                                        printf("%s", "  ");
+
+                                if (i == selected_idx)
+                                        printf(YELLOW BOLD INVERT);
+
+                                printf("%s", name);
+
+                                if (i == selected_idx)
+                                        printf(RESET);
+
+                                cursor_x = would_be;
+                                items_shown++;
                         }
-
-                        printf("%s", completions[i] ? completions[i] : "?");
-
-                        if (i == selected_idx)
-                                printf(RESET);
                 }
 
                 gotoxy(strlen("Find File [ ") + str_len(&inbuf), win->h);
@@ -118,30 +198,34 @@ find_file(window *win)
                 switch (ty) {
                 case INPUT_TYPE_NORMAL:
                         if (ENTER(ch)) {
-                                if (out_count > 0 && selected_idx < out_count)
+                                if (total_matches > 0 && selected_idx < total_matches)
                                         chosen_file = strdup(completions[selected_idx]);
                                 free(completions);
                                 goto done;
                         }
                         else if (BACKSPACE(ch)) {
-                                if (str_len(&inbuf) > 0)
+                                if (str_len(&inbuf) > 0) {
                                         str_pop(&inbuf);
-                                selected_idx = 0;
+                                        selected_idx = 0;
+                                        offset = 0;
+                                }
                         }
                         else if (isprint(ch) || ch == ' ') {
                                 str_append(&inbuf, ch);
                                 selected_idx = 0;
+                                offset = 0;
                         }
                         break;
 
                 case INPUT_TYPE_CTRL:
                         if (ch == CTRL_N) {
-                                if (out_count > 0)
-                                        selected_idx = (selected_idx + 1) % out_count;
+                                if (total_matches > 0 && selected_idx < total_matches - 1)
+                                        selected_idx++;
                         } else if (ch == CTRL_P) {
-                                if (out_count > 0)
-                                        selected_idx = (selected_idx == 0) ? out_count-1 : selected_idx-1;
-                        }
+                                if (total_matches > 0 && selected_idx > 0)
+                                        selected_idx--;
+                        } else if (ch == CTRL_G)
+                                goto done;
                         break;
 
                 default:
@@ -151,17 +235,23 @@ find_file(window *win)
                 free(completions);
         }
 
-done:
-        if (!chosen_file)
+ done:
+        trie_destroy(trie);
+        dyn_array_free(files);
+        str_destroy(&inbuf);
+
+        if (!chosen_file) {
+                buffer_dump(win->ab);
                 return;
+        }
 
         assert(!is_dir(chosen_file));
 
-        str     fp;
-        buffer *b;
+        str fp = str_from(chosen_file);
+        buffer *b = buffer_from_file(fp, win);
+        free(chosen_file);
 
-        fp = str_from(chosen_file);
-        if (!(b = buffer_from_file(fp, win)))
+        if (!b)
                 return;
 
         window_add_buffer(win, b, 1);
