@@ -12,4 +12,6 @@ char *load_file(const char *path);
 cstr_array lsdir(const char *path);
 cstr_array walkdir(const char *path);
 
+const char *gethome(void);
+
 #endif // IO_H_INCLUDED

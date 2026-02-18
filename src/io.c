@@ -7,6 +7,9 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <errno.h>
+#include <pwd.h>
+#include <unistd.h>
 
 int
 file_exists(const char *fp)
@@ -103,4 +106,36 @@ lsdir(const char *dir)
 
         closedir(dp);
         return files;
+}
+
+const char *
+gethome(void)
+{
+        static char buf[1024] = {0};
+        const char *home = getenv("HOME");
+
+        if (home != NULL && home[0] != '\0') {
+                size_t len = strlen(home);
+                if (len >= sizeof(buf)) {
+                        errno = ENAMETOOLONG;
+                        return NULL;
+                }
+                memcpy(buf, home, len + 1);
+                return buf;
+        }
+
+        struct passwd *pw = getpwuid(getuid());
+        if (pw != NULL && pw->pw_dir != NULL && pw->pw_dir[0] != '\0') {
+                size_t len = strlen(pw->pw_dir);
+                if (len >= sizeof(buf)) {
+                        errno = ENAMETOOLONG;
+                        return NULL;
+                }
+                memcpy(buf, pw->pw_dir, len + 1);
+                return buf;
+        }
+
+        /* Failure */
+        errno = ENOENT;
+        return NULL;
 }

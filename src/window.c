@@ -652,8 +652,10 @@ metax(window *win)
         for (size_t i = 0; i < sizeof(cmds)/sizeof(*cmds); ++i)
                 dyn_array_append(names, cmds[i]);
 
-        if (!(selected = completion_run(win, "M-x", names)))
+        if (!(selected = completion_run(win, "M-x", names))) {
+                buffer_dump(win->ab);
                 goto done;
+        }
 
         if (!strcmp(selected, WINCMD_SPCAMT)) {
                 assert(0 && "set space amount");

@@ -183,3 +183,11 @@ clear_line(size_t dx, size_t dy)
         gotoxy(dx, dy);
         fflush(stdout);
 }
+
+void
+anykey(void)
+{
+        printf("Press any key to continue...\n");
+        char _;
+        get_input(&_);
+}

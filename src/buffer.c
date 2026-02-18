@@ -43,7 +43,6 @@ state_to_cstr(const buffer *b)
         case BS_SEARCH: return "search";
         default: return "unknown";
         }
-
         return "unknown";
 }
 
