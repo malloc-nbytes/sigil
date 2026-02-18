@@ -5,6 +5,8 @@
 #include "window.h"
 #include "colors.h"
 #include "pair.h"
+#include "glconf.h"
+#include "flags.h"
 
 #include <assert.h>
 #include <stdlib.h>
@@ -536,9 +538,9 @@ backspace(buffer *b)
                 return 1;
         }
 
-        if (b->last_tab > 0) {
+        if (b->last_tab > 0 && (glconf.flags & FT_SPACESARETABS)) {
                 --b->last_tab;
-                for (size_t i = 0; i < 8; ++i) {
+                for (size_t i = 0; i < glconf.defaults.space_amt; ++i) {
                         buffer_left(b);
                         str_rm(&ln->s, b->cx);
                         if (b->cx > str_len(&ln->s)-1)
@@ -560,8 +562,12 @@ tab(buffer *b)
 {
         ++b->last_tab;
 
-        for (size_t i = 0; i < 8; ++i)
-                insert_char(b, ' ', 1);
+        if (glconf.flags & FT_SPACESARETABS) {
+                for (size_t i = 0; i < glconf.defaults.space_amt; ++i)
+                        insert_char(b, ' ', 1);
+        }
+        else
+                insert_char(b, '\t', 1);
 }
 
 static void

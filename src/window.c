@@ -5,6 +5,7 @@
 #include "str.h"
 #include "colors.h"
 #include "fuzzy.h"
+#include "glconf.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -591,6 +592,8 @@ compilation_buffer(window *win)
 
         if (win->compile)
                 input = str_from(win->compile);
+        else if (glconf.defaults.compile_cmd)
+                input = str_from(glconf.defaults.compile_cmd);
         else
                 input = str_create();
 
