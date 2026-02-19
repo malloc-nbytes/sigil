@@ -40,10 +40,10 @@ static const char *
 state_to_cstr(const buffer *b)
 {
         switch (b->state) {
-        case BS_NORMAL: return "normal";
+        case BS_NORMAL:    return "normal";
         case BS_SELECTION: return "selection";
-        case BS_SEARCH: return "search";
-        default: return "unknown";
+        case BS_SEARCH:    return "search";
+        default:           return "unknown";
         }
         return "unknown";
 }
@@ -772,7 +772,7 @@ prev_paragraph(buffer *b)
         b->cx = 0;
         b->al = nextln;
 
-        return adjust_scroll(b);
+        return adjust_scroll(b) || b->state == BS_SELECTION;
 }
 
 static int
@@ -797,7 +797,7 @@ next_paragraph(buffer *b)
         b->cx = 0;
         b->al = nextln;
 
-        return adjust_scroll(b);
+        return adjust_scroll(b) || b->state == BS_SELECTION;
 }
 
 static void
