@@ -1271,6 +1271,50 @@ jump_to_line(buffer *b)
         adjust_scroll(b);
 }
 
+static int
+super_backspace(buffer *b)
+{
+        if (!writable(b))
+                return 0;
+
+        line   *ln;
+        size_t  len;
+        int     deleted_newline;
+        size_t  start;
+
+        ln              = b->lns.data[b->al];
+        len             = str_len(&ln->s);
+        deleted_newline = 0;
+        start           = b->cx;
+
+        // cursor at beginning of line fall back to regular backspace
+        if (b->cx == 0)
+                return backspace(b);
+
+        b->saved = 0;
+
+        while (start > 0 && isspace((unsigned char)str_at(&ln->s, start - 1)))
+                --start;
+
+        if (start > 0) {
+                while (start > 0 && !isspace((unsigned char)str_at(&ln->s, start - 1)))
+                        --start;
+        }
+
+        // nothing to remove
+        if (start == b->cx)
+                return 0;
+
+        str_remove_range(&ln->s, start, b->cx - start);
+
+        b->cx       = start;
+        b->last_tab = 0;
+
+        adjust_scroll(b);
+
+        return 1;
+}
+
 // entrypoint
 buffer_proc
 buffer_process(buffer     *b,
@@ -1382,6 +1426,8 @@ buffer_process(buffer     *b,
                 } else if (ch == 'g') {
                         jump_to_line(b);
                         return BP_INSERTNL;
+                } else if (BACKSPACE(ch)) {
+                        return super_backspace(b) ? BP_INSERTNL : BP_INSERT;
                 }
         } break;
         case INPUT_TYPE_ARROW: {
