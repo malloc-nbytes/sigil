@@ -1271,6 +1271,22 @@ jump_to_line(buffer *b)
         adjust_scroll(b);
 }
 
+static int
+super_backspace(buffer *b)
+{
+        int hitchars;
+        int newline;
+
+        hitchars = 0;
+        newline  = 0;
+
+        while (str_at(&b->lns.data[b->al]->s, b->cx) != ' ') {
+                backspace(b);
+        }
+
+        return newline;
+}
+
 // entrypoint
 buffer_proc
 buffer_process(buffer     *b,
@@ -1382,6 +1398,8 @@ buffer_process(buffer     *b,
                 } else if (ch == 'g') {
                         jump_to_line(b);
                         return BP_INSERTNL;
+                } else if (BACKSPACE(ch)) {
+                        return super_backspace(b) ? BP_INSERTNL : BP_INSERT;
                 }
         } break;
         case INPUT_TYPE_ARROW: {
