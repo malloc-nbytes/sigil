@@ -250,9 +250,6 @@ static buffer *
 buffer_exists_by_name(window     *win,
                       const char *name)
 {
-        if (strlen(name) > 3 && name[0] == '.' && name[1] == '/')
-                name += 2;
-
         for (size_t i = 0; i < win->bfrs.len; ++i) {
                 if (!strcmp(name, str_cstr(&win->bfrs.data[i]->name)))
                         return win->bfrs.data[i];
@@ -387,8 +384,13 @@ find_file(window *win)
         str     fp = str_from(chosen_file);
         buffer *b  = NULL;
 
-        if (!(b = buffer_exists_by_name(win, chosen_file)))
-                b = buffer_from_file(fp, win);
+        if (!(b = buffer_exists_by_name(win, chosen_file))) {
+                char *real = get_realpath(str_cstr(&fp));
+                if (real)
+                        b = buffer_from_file(str_from(real), win);
+                else
+                        b = buffer_from_file(fp, win);
+        }
 
         free(chosen_file);
 
@@ -825,8 +827,13 @@ try_jump_to_error(window *win)
 
         buffer *b = NULL;
 
-        if (!(b = buffer_exists_by_name(win, filename)))
-                b = buffer_from_file(str_from(filename), win);
+        if (!(b = buffer_exists_by_name(win, filename))) {
+                char *real = get_realpath(filename);
+                if (real)
+                        b = buffer_from_file(str_from(real), win);
+                else
+                        b = buffer_from_file(str_from(filename), win);
+        }
 
         window_add_buffer(win, b, 1);
         buffer_jump_to_verts(win->ab, col-1, row-1);

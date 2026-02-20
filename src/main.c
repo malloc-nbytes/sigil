@@ -21,9 +21,15 @@ run(const char *filename)
         window  win;
         buffer *buffer;
         str     fp;
+        char   *real;
 
-        fp     = str_from(filename);
         win    = window_create(glconf.term.w, glconf.term.h);
+        real   = get_realpath(filename);
+
+        if (real)
+                fp = str_from(real);
+        else
+                fp = str_from(filename);
 
         if (!(buffer = buffer_from_file(fp, &win)))
                 return 0;

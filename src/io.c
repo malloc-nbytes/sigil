@@ -139,3 +139,49 @@ gethome(void)
         errno = ENOENT;
         return NULL;
 }
+
+char *
+get_realpath(const char *fp)
+{
+        char *result = NULL;
+
+        if (!fp || !*fp)
+                return NULL;
+
+        if (fp[0] == '~') {
+                struct passwd *pw = getpwuid(getuid());
+                if (!pw)
+                        return NULL;
+
+                size_t home_len = strlen(pw->pw_dir);
+                size_t fp_len = strlen(fp);
+                result = malloc(home_len + fp_len);
+                if (!result) { return NULL; }
+
+                strcpy(result, pw->pw_dir);
+                strcat(result, fp + 1); // Skip the ~
+        } else {
+                result = strdup(fp);
+                if (!result)
+                        return NULL;
+        }
+
+        char *absolute = realpath(result, NULL);
+        free(result);
+
+        if (!absolute) {
+                return NULL;
+        }
+
+        return absolute;
+}
+
+const char *
+get_basename(const char *name)
+{
+        for (int i = strlen(name)-2; i >= 0; --i) {
+                if (name[i] == '/')
+                        return name+i+1;
+        }
+        return name;
+}
