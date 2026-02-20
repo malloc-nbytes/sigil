@@ -335,19 +335,20 @@ find_file(window *win)
         files = lsdir(str_cstr(&cwd));
         char *selected = completion_run(win, "Find File", files);
 
-
         if (!selected)
                 goto done;
 
         if (strcmp(selected, "..") == 0) {
-                char *slash = strrchr(str_cstr(&cwd), '/');
+                //char *slash = strrchr(str_cstr(&cwd), '/');
 
-                if (slash && slash != str_cstr(&cwd))
+                str_concat(&cwd, "/..");
+
+                /*if (slash && slash != str_cstr(&cwd))
                         *slash = '\0';
                 else {
                         str_destroy(&cwd);
                         cwd = str_from(".");
-                }
+                }*/
 
                 free(selected);
                 dyn_array_free(files);
