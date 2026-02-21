@@ -1464,16 +1464,20 @@ show_whitespace(const buffer *b,
 {
         int         space;
         const char *sraw;
+        char        spc;
 
         space = -1;
         sraw  = str_cstr(s);
+        spc   = (glconf.flags & FT_SHOWTRAILS) != 0
+                        ? '-'
+                        : ' ';
 
         if (eol <= -1)
                 return;
         else {
                 printf(GRAY);
                 for (size_t i = 0; i < str_len(s)-eol-1; ++i)
-                        putchar('-');
+                        putchar(spc);
                 printf(RESET);
         }
 }

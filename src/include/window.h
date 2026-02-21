@@ -17,6 +17,7 @@
 #define WINCMD_REPLACE       "replace"
 #define WINCMD_HELP          "help"
 #define WINCMD_FINDFILE      "find-file"
+#define WINDCMD_TRAILMODE    "trail-mode"
 #define WINCMDS { \
         WINCMD_SPCAMT, \
         WINCMD_KILLBUF, \
@@ -30,6 +31,7 @@
         WINCMD_REPLACE, \
         WINCMD_HELP, \
         WINCMD_FINDFILE, \
+        WINDCMD_TRAILMODE, \
 }
 
 typedef struct window {

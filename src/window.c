@@ -807,6 +807,9 @@ metax(window *win)
                 buffer_dump(win->ab);
         } else if (!strcmp(selected, WINCMD_FINDFILE)) {
                 find_file(win);
+        } else if (!strcmp(selected, WINDCMD_TRAILMODE)) {
+                glconf.flags ^= FT_SHOWTRAILS;
+                buffer_dump(win->ab);
         } else {
                 assert(0 && "unknown M-x command");
         }
