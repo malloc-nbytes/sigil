@@ -35,6 +35,10 @@ lines_of_cstr(const char *s)
         char_array buf;
 
         lns = dyn_array_empty(line_array);
+
+        if (!s)
+                return lns;
+
         buf = dyn_array_empty(char_array);
 
         for (size_t i = 0; s[i]; ++i) {
